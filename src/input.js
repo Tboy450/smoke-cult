@@ -9,12 +9,15 @@ function shapeStick(x) {
 	return Math.sign(x) * ((m - DEADZONE) / (1 - DEADZONE)) ** 1.4;
 }
 
-export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onController = () => {}, isTouchBlocked = () => false }) {
+const MENU_KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
+
+export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onController = () => {}, onGarage = () => {}, onMenu = () => {}, isMenuOpen = () => false, isTouchBlocked = () => false }) {
 	const keys = new Set();
 	const touch = { gas: false, brake: false, handbrake: false, steer: 0 };
 	let device = typeof matchMedia === "function" && matchMedia(TOUCH_LAYOUT_QUERY).matches ? "touch" : "keyboard";
 	let padWas = {};
 	let padId = null;
+	let stickHeld = false;
 	let active = true;
 	const heldButtons = new Map();
 	let steerId = null;
@@ -35,6 +38,15 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 			if (!e.repeat) onTune();
 			return;
 		}
+		if (isMenuOpen()) {
+			const step = MENU_KEYS[e.code];
+			if (step) onMenu(step[0], step[1]);
+			else if (!e.repeat && (e.code === "Enter" || e.code === "Space")) onMenu(0, 0, "confirm");
+			else if (!e.repeat && (e.code === "Escape" || e.code === "KeyG")) onMenu(0, 0, "back");
+			else return;
+			e.preventDefault();
+			return;
+		}
 		if (e.repeat) return;
 		// A focused slider or button keeps the keys it uses; every other key still drives.
 		const inForm = e.target?.closest?.("input, textarea, select, button");
@@ -46,6 +58,7 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 		if (e.code === "KeyR") onReset();
 		if (e.code === "KeyC") onCamera();
 		if (e.code === "KeyM") onMute();
+		if (e.code === "KeyG") onGarage();
 		if (e.code === "Space") e.preventDefault();
 	});
 	addEventListener("keyup", (e) => keys.delete(e.code));
@@ -90,7 +103,7 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 			touch[key] = (heldButtons.get(key)?.size ?? 0) > 0;
 		});
 	}
-	for (const [id, fn] of [["touch-preset", onPreset], ["touch-reset", onReset], ["touch-cam", onCamera], ["touch-tune", onTune]]) {
+	for (const [id, fn] of [["touch-preset", onPreset], ["touch-reset", onReset], ["touch-cam", onCamera], ["touch-tune", onTune], ["touch-garage", onGarage]]) {
 		document.getElementById(id)?.addEventListener("click", fn);
 	}
 
@@ -128,12 +141,31 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 				padBrake = b(6).value;
 				padHandbrake = b(0).pressed || b(2).pressed;
 				const pressedNow = (i) => b(i).pressed && !padWas[i];
-				if (pressedNow(12)) onPreset(); // D-pad up
-				if (pressedNow(13)) onReset(); // D-pad down
-				if (pressedNow(3)) onCamera(); // Y
-				if (pressedNow(8) || pressedNow(9)) onTune(); // View / Menu
+				if (isMenuOpen()) {
+					// D-pad or left stick moves through the garage; A drives, B or Menu goes back.
+					const stickX = Math.abs(pad.axes[0] ?? 0) > 0.6 ? Math.sign(pad.axes[0]) : 0;
+					const stickY = Math.abs(pad.axes[1] ?? 0) > 0.6 ? Math.sign(pad.axes[1]) : 0;
+					if (pressedNow(12) || (stickY < 0 && !stickHeld)) onMenu(0, -1);
+					if (pressedNow(13) || (stickY > 0 && !stickHeld)) onMenu(0, 1);
+					if (pressedNow(14) || (stickX < 0 && !stickHeld)) onMenu(-1, 0);
+					if (pressedNow(15) || (stickX > 0 && !stickHeld)) onMenu(1, 0);
+					stickHeld = stickX !== 0 || stickY !== 0;
+					if (pressedNow(0)) onMenu(0, 0, "confirm");
+					else if (pressedNow(1) || pressedNow(9)) onMenu(0, 0, "back");
+				} else {
+					if (pressedNow(12)) onPreset(); // D-pad up
+					if (pressedNow(13)) onReset(); // D-pad down
+					if (pressedNow(3)) onCamera(); // Y
+					if (pressedNow(9)) onGarage(); // Menu
+				}
+				if (pressedNow(8)) onTune(); // View
 				for (let i = 0; i < pad.buttons.length; i++) padWas[i] = pad.buttons[i].pressed;
 				if (padSteer || padGas > 0.05 || padBrake > 0.05 || padHandbrake) device = "gamepad";
+			}
+			if (isMenuOpen()) {
+				clearTouch();
+				Object.assign(controls, { throttle: 0, brake: 0, steer: 0, handbrake: false });
+				return;
 			}
 			if (isTouchBlocked()) clearTouch();
 			const keySteer = (down("KeyD", "ArrowRight") ? 1 : 0) - (down("KeyA", "ArrowLeft") ? 1 : 0);

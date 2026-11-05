@@ -1,20 +1,28 @@
-// Drift sandbox: the M1 test pad, one car, chase camera, HUD and a live tuning panel.
+// SMOKE CULT: Rustline Yard, the garage, one car on track, chase camera, HUD and a live tuning panel.
 
 import * as THREE from "three";
+import { carById } from "./cars.js";
 import { createCarModel } from "./carModel.js";
 import { createEffects } from "./effects.js";
+import { createGarageUi } from "./garageUi.js";
+import { createGarageState, picked, saveData, stepOption } from "./garageState.js";
 import { createInput, TOUCH_LAYOUT_QUERY } from "./input.js";
-import { createCar, resetCar, stepCar, carAxes } from "./physics.js";
+import { createCar, fitCar, placeCar, resetCar, stepCar, carAxes } from "./physics.js";
+import { awardBonus, createScore, stepScore, finishScore, SCORE_RULES } from "./scoring.js";
+import { createSound } from "./sound.js";
+import { buildTrack, collideCar, createLap, createTrackWorld, GARAGE, nearestSample, resetLap, stepLap, zoneAt } from "./track.js";
 import { CAR, PRESET_ORDER, RANGES } from "./tuning.js";
 import { createTuningPanel } from "./tuningPanel.js";
-import { createScore, stepScore, finishScore, SCORE_RULES } from "./scoring.js";
+import { buildYard } from "./yard.js";
 
 const PHYSICS_DT = 1 / 240;
+const WALL_HIT = 3.5; // m/s into a wall that ends a combo; anything softer is a scrape
+const CLIP_ANGLE = 20;
+const SAVE_KEY = "smoke-cult-garage";
 const tuning = { ...CAR };
 
 // --- renderer, scene, light ---
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -22,50 +30,20 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 document.getElementById("app").appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x6a3a7a);
-scene.fog = new THREE.Fog(0x6a3a7a, 80, 420);
-scene.add(new THREE.HemisphereLight(0xffd6f0, 0x3a2a40, 2.2));
-const sun = new THREE.DirectionalLight(0xffc890, 3.2);
+scene.fog = new THREE.Fog(0x8a4a78, 130, 680);
+scene.add(new THREE.HemisphereLight(0xffd6f0, 0x46323c, 1.7));
+const sun = new THREE.DirectionalLight(0xffc890, 3);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 150 });
+Object.assign(sun.shadow.camera, { left: -34, right: 34, top: 34, bottom: -34, near: 1, far: 170 });
 scene.add(sun, sun.target);
 
-const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 1000);
-addEventListener("resize", () => {
-	camera.aspect = innerWidth / innerHeight;
-	camera.updateProjectionMatrix();
-	renderer.setSize(innerWidth, innerHeight);
-});
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 1500);
 
-// --- test pad: asphalt lot, painted grid, cones ---
-function asphaltTexture() {
-	const c = document.createElement("canvas");
-	c.width = c.height = 512;
-	const g = c.getContext("2d");
-	g.fillStyle = "#4a4a52";
-	g.fillRect(0, 0, 512, 512);
-	for (let i = 0; i < 9000; i++) {
-		const v = 60 + Math.random() * 40;
-		g.fillStyle = `rgb(${v},${v},${v + 6})`;
-		g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
-	}
-	g.fillStyle = "rgba(235,235,240,0.55)";
-	g.fillRect(0, 0, 512, 4); // grid line every tile (25 m)
-	g.fillRect(0, 0, 4, 512);
-	const t = new THREE.CanvasTexture(c);
-	t.wrapS = t.wrapT = THREE.RepeatWrapping;
-	t.repeat.set(32, 32);
-	t.anisotropy = 8;
-	t.colorSpace = THREE.SRGBColorSpace;
-	return t;
-}
-const ground = new THREE.Mesh(
-	new THREE.PlaneGeometry(800, 800).rotateX(-Math.PI / 2),
-	new THREE.MeshStandardMaterial({ map: asphaltTexture(), roughness: 0.95 }),
-);
-ground.receiveShadow = true;
-scene.add(ground);
+// --- the yard ---
+const track = buildTrack();
+const world = createTrackWorld(track);
+const yard = buildYard(scene, renderer, track);
 
 const coneGeo = new THREE.ConeGeometry(0.22, 0.7, 16).translate(0, 0.35, 0);
 const coneMat = new THREE.MeshStandardMaterial({ color: 0xff6a10, roughness: 0.6 });
@@ -84,30 +62,94 @@ for (let i = 0; i < 16; i++) {
 	const a = (i / 16) * Math.PI * 2;
 	cone(-72 + Math.cos(a) * 20, 17 + Math.sin(a) * 20); // donut circle
 }
+function resetCones() {
+	for (const c of cones) {
+		c.hit = false;
+		c.mesh.position.copy(c.home);
+		c.mesh.rotation.set(0, 0, 0);
+	}
+}
 
 // --- car ---
-const SPAWN = [0, 1, 30];
-const car = createCar(tuning, SPAWN, 0);
+const car = createCar(tuning, [track.spawn.x, 1, track.spawn.z], track.spawn.yaw);
 const score = createScore();
+const lap = createLap();
 const model = createCarModel(scene, tuning);
 const effects = createEffects(scene);
 
 // --- HUD ---
 const $ = (id) => document.getElementById(id);
 const HINTS = {
-	keyboard: "W gas · S brake/reverse · A/D steer · SPACE handbrake · T assist · R reset · C camera · TAB tuning · M sound",
-	gamepad: "RT gas · LT brake/reverse · Left stick steer · A/X handbrake · D-pad ↑ assist · D-pad ↓ reset · Y camera · Menu tuning",
-	touch: "Drag left side to steer · GAS / BRAKE / HB on the right · TUNE for settings",
+	keyboard: "W gas · S brake/reverse · A/D steer · SPACE handbrake · T assist · R reset · C camera · G garage · TAB tuning · M sound",
+	gamepad: "RT gas · LT brake/reverse · Left stick steer · A/X handbrake · D-pad ↑ assist · D-pad ↓ reset · Y camera · Menu garage · View tuning",
+	touch: "Drag left side to steer · GAS / BRAKE / HB on the right",
 };
 const touchLayout = matchMedia(TOUCH_LAYOUT_QUERY);
 const syncTouchLayout = () => document.body.classList.toggle("touch", touchLayout.matches);
 syncTouchLayout();
 touchLayout.addEventListener("change", syncTouchLayout);
 
+function loadGarage() {
+	try {
+		return JSON.parse(localStorage.getItem(SAVE_KEY));
+	} catch {
+		return null;
+	}
+}
+function saveGarage() {
+	try {
+		localStorage.setItem(SAVE_KEY, JSON.stringify(saveData(garage)));
+	} catch {
+		// Private windows can refuse storage. The game works the same, it just won't remember.
+	}
+}
+const garage = createGarageState(loadGarage(), touchLayout.matches);
+// Sound itself starts on the first real tap or key press. Starting it any earlier is what phones refuse.
+const sound = createSound({ enabled: picked(garage, "sound").id === "on" });
+
+let mode = "garage";
 let cameraMode = 0; // 0 chase, 1 low drift cam, 2 hood
 const CAMERA_NAMES = ["Chase", "Drift cam", "Hood"];
 const cycle = (list, current) => list[(list.indexOf(current) + 1) % list.length];
 const tuningPanel = createTuningPanel($("tune"), $("tune-close"));
+
+function fitView() {
+	camera.aspect = innerWidth / innerHeight;
+	renderer.setSize(innerWidth, innerHeight);
+	// In the garage, slide the picture so the car sits clear of the menu.
+	if (mode !== "garage") camera.clearViewOffset();
+	else if (innerWidth > innerHeight) camera.setViewOffset(innerWidth, innerHeight, -innerWidth * 0.17, 0, innerWidth, innerHeight);
+	else camera.setViewOffset(innerWidth, innerHeight, 0, innerHeight * 0.24, innerWidth, innerHeight);
+	camera.updateProjectionMatrix();
+}
+addEventListener("resize", fitView);
+
+function openGarage() {
+	if (mode === "garage") return;
+	finishScore(score, "Back to garage", true);
+	mode = "garage";
+	document.body.classList.add("garage");
+	yard.garage.setLit(true);
+	garageUi.render();
+	fitView();
+}
+
+function leaveGarage() {
+	mode = "drive";
+	document.body.classList.remove("garage");
+	yard.garage.setLit(false);
+	saveGarage();
+	const spot = picked(garage, "place").id === "pad" ? track.padSpawn : track.spawn;
+	placeCar(car, spot.x, spot.z, spot.yaw);
+	resetLap(lap, track, car.pos[0], car.pos[2]);
+	resetCones();
+	effects.clearSkids();
+	const { look } = carAxes(car);
+	camPos.set(spot.x - look[0] * 7, 3, spot.z - look[2] * 7);
+	camLook.set(spot.x, 0.6, spot.z);
+	fitView();
+}
+
 const input = createInput({
 	onPreset: () => {
 		finishScore(score, "Assist changed");
@@ -115,22 +157,38 @@ const input = createInput({
 		syncPresetButtons();
 	},
 	onReset: () => {
+		if (mode === "garage") return;
 		finishScore(score, "Car reset");
-		resetCar(car, tuning);
-		effects.clearSkids();
-		for (const c of cones) {
-			c.hit = false;
-			c.mesh.position.copy(c.home);
-			c.mesh.rotation.set(0, 0, 0);
+		// Near the road, go back onto it facing the right way. Anywhere else, just get back on your wheels.
+		const near = nearestSample(track, car.pos[0], car.pos[2]);
+		if (near.distance < 40) {
+			const p = track.samples[near.index];
+			placeCar(car, p.x, p.z, Math.atan2(-p.tx, -p.tz));
+		} else {
+			resetCar(car, tuning);
 		}
+		resetLap(lap, track, car.pos[0], car.pos[2]);
+		effects.clearSkids();
+		resetCones();
 	},
 	onCamera: () => {
+		if (mode === "garage") return;
 		cameraMode = (cameraMode + 1) % CAMERA_NAMES.length;
 		flash(CAMERA_NAMES[cameraMode]);
 	},
 	onTune: () => tuningPanel.toggle(),
-	onMute: () => sound.toggle(),
-	onController: (standard) => flash(standard ? "Controller connected" : "Controller connected (basic mode)"),
+	onMute: toggleSound,
+	onController: (standard) => {
+		sound.unlock();
+		flash(standard ? "Controller connected" : "Controller connected (basic mode)");
+	},
+	onGarage: openGarage,
+	isMenuOpen: () => mode === "garage",
+	onMenu: (dx, dy, action) => {
+		sound.unlock();
+		if (action) leaveGarage();
+		else garageUi.move(dx, dy);
+	},
 	// The open panel covers the touch controls. Keyboard and controller keep driving so changes can be felt live.
 	isTouchBlocked: () => $("tune").classList.contains("open"),
 });
@@ -139,11 +197,12 @@ let flashTimer = 0;
 function flash(text) {
 	$("flash").textContent = text;
 	$("flash").style.opacity = 1;
-	flashTimer = 1.2;
+	flashTimer = 1.4;
 }
 
 // --- tuning panel ---
 const tuneRows = $("tune-rows");
+const sliderViews = [];
 for (const [name, [min, max, step]] of Object.entries(RANGES)) {
 	const row = document.createElement("label");
 	row.innerHTML = `<span>${name}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
@@ -156,8 +215,16 @@ for (const [name, [min, max, step]] of Object.entries(RANGES)) {
 		tuning[name] = Number(slider.value);
 		show();
 	});
+	sliderViews.push(() => {
+		slider.value = tuning[name];
+		show();
+	});
 	row.dataset.name = name;
 	tuneRows.appendChild(row);
+}
+// Only shows the numbers. Sliders round to their step, so they must never write a car's real values back.
+function syncTuningSliders() {
+	for (const view of sliderViews) view();
 }
 function syncPresetButtons() {
 	for (const b of document.querySelectorAll("#tune-presets button")) b.classList.toggle("on", b.dataset.preset === car.preset);
@@ -175,11 +242,8 @@ for (const name of PRESET_ORDER) {
 }
 syncPresetButtons();
 $("tune-reset").addEventListener("click", () => {
-	Object.assign(tuning, CAR);
-	for (const row of tuneRows.children) {
-		row.querySelector("input").value = tuning[row.dataset.name];
-		row.querySelector("input").dispatchEvent(new Event("input"));
-	}
+	Object.assign(tuning, CAR, carById(picked(garage, "car").id).tuning);
+	syncTuningSliders();
 });
 $("tune-copy").addEventListener("click", async () => {
 	const text = JSON.stringify(tuning, null, "\t");
@@ -192,69 +256,107 @@ $("tune-copy").addEventListener("click", async () => {
 	}
 });
 
-// --- engine + tire sound (starts after the first key/tap, as browsers require) ---
-const sound = (() => {
-	let ctx = null;
-	let engine, engineGain, squealGain, master;
-	let muted = false;
-	const start = () => {
-		if (ctx) return;
-		ctx = new AudioContext();
-		master = ctx.createGain();
-		master.gain.value = 0.25;
-		master.connect(ctx.destination);
-		engine = ctx.createOscillator();
-		engine.type = "sawtooth";
-		const filter = ctx.createBiquadFilter();
-		filter.type = "lowpass";
-		filter.frequency.value = 900;
-		engineGain = ctx.createGain();
-		engine.connect(filter).connect(engineGain).connect(master);
-		engine.start();
-		const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-		const data = noise.getChannelData(0);
-		for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-		const src = ctx.createBufferSource();
-		src.buffer = noise;
-		src.loop = true;
-		const band = ctx.createBiquadFilter();
-		band.type = "bandpass";
-		band.frequency.value = 1800;
-		band.Q.value = 3;
-		squealGain = ctx.createGain();
-		squealGain.gain.value = 0;
-		src.connect(band).connect(squealGain).connect(master);
-		src.start();
-	};
-	addEventListener("keydown", start, { once: true });
-	addEventListener("pointerdown", start, { once: true });
-	return {
-		toggle() {
-			muted = !muted;
-			if (master) master.gain.value = muted ? 0 : 0.25;
-			flash(muted ? "Sound off" : "Sound on");
-		},
-		update(car, controls) {
-			if (!ctx) return;
-			// Fake 5-speed gearbox: rpm climbs in each gear band.
-			const v = Math.max(0, car.forwardSpeed);
-			const gearTop = [11, 20, 30, 42, 60];
-			let gear = gearTop.findIndex((t) => v < t);
-			if (gear < 0) gear = 4;
-			const low = gear === 0 ? 0 : gearTop[gear - 1];
-			let rpm = 0.25 + 0.75 * ((v - low) / (gearTop[gear] - low));
-			const rearSlip = Math.max(car.wheels[2].slip, car.wheels[3].slip);
-			if (controls.throttle > 0 && rearSlip > 4) rpm = Math.min(1.05, rpm + 0.25); // wheelspin revs
-			const t = ctx.currentTime;
-			engine.frequency.setTargetAtTime(45 + rpm * 160, t, 0.05);
-			engineGain.gain.setTargetAtTime(0.25 + controls.throttle * 0.5, t, 0.08);
-			squealGain.gain.setTargetAtTime(Math.min(0.6, Math.max(0, (rearSlip - 4) / 14)), t, 0.05);
-		},
-	};
+// --- garage ---
+function applyLook() {
+	model.setLook({ paint: picked(garage, "paint").color, rims: picked(garage, "rims").color, glow: picked(garage, "glow").color });
+	effects.setSmokeColor(picked(garage, "smoke").color);
+}
+function applyCar() {
+	const def = carById(picked(garage, "car").id);
+	Object.assign(tuning, CAR, def.tuning);
+	syncTuningSliders();
+	fitCar(car, tuning, def.wheels, def.body);
+	model.setCar(def);
+	applyLook();
+}
+function showSoundButton() {
+	const on = picked(garage, "sound").id === "on";
+	$("sound-btn").textContent = on ? "SOUND ON" : "SOUND OFF";
+	$("sound-btn").classList.toggle("off", !on);
+}
+function applySound() {
+	sound.setEnabled(picked(garage, "sound").id === "on");
+	showSoundButton();
+}
+function toggleSound() {
+	stepOption(garage, "sound", 1);
+	applySound();
+	saveGarage();
+	garageUi.render();
+	flash(sound.enabled ? "Sound on" : "Sound off");
+}
+function applyGraphics() {
+	const low = picked(garage, "graphics").id === "low";
+	renderer.setPixelRatio(low ? 1 : Math.min(devicePixelRatio, 2));
+	renderer.setSize(innerWidth, innerHeight);
+	sun.castShadow = !low;
+}
+const garageUi = createGarageUi($("garage"), garage, {
+	onChange: (key) => {
+		if (key === "car") applyCar();
+		else if (key === "graphics") applyGraphics();
+		else if (key === "sound") applySound();
+		else if (key !== "place") applyLook();
+		saveGarage();
+	},
+	onDrive: leaveGarage,
+});
+applyCar();
+applyGraphics();
+showSoundButton();
+garageUi.render();
+$("sound-btn").addEventListener("click", toggleSound);
+
+// --- minimap: the road is drawn once, then only the dot moves ---
+const map = $("minimap");
+const mapContext = map.getContext("2d");
+const MAP_PAD = 8;
+const mapBase = document.createElement("canvas");
+mapBase.width = mapBase.height = map.width;
+const mapScale = (() => {
+	const reach = Math.max(...track.samples.map((p) => Math.max(Math.abs(p.x), Math.abs(p.z))));
+	return (map.width / 2 - MAP_PAD) / reach;
 })();
+const toMap = (x, z) => [map.width / 2 + x * mapScale, map.height / 2 + z * mapScale];
+{
+	const g = mapBase.getContext("2d");
+	const path = () => {
+		g.beginPath();
+		track.samples.forEach((p, i) => g[i ? "lineTo" : "moveTo"](...toMap(p.x, p.z)));
+		g.closePath();
+	};
+	g.lineJoin = "round";
+	g.strokeStyle = "rgba(10,4,16,0.75)";
+	g.lineWidth = 9;
+	path();
+	g.stroke();
+	g.strokeStyle = "#e8e4ee";
+	g.lineWidth = 4;
+	path();
+	g.stroke();
+	g.fillStyle = "#ff2aa0";
+	for (const zone of track.zones) {
+		const [x, y] = toMap(track.samples[zone.apex].x, track.samples[zone.apex].z);
+		g.beginPath();
+		g.arc(x, y, 3.5, 0, Math.PI * 2);
+		g.fill();
+	}
+}
+function drawMinimap() {
+	mapContext.clearRect(0, 0, map.width, map.height);
+	mapContext.drawImage(mapBase, 0, 0);
+	const [x, y] = toMap(car.pos[0], car.pos[2]);
+	mapContext.fillStyle = "#ffd23f";
+	mapContext.strokeStyle = "#120818";
+	mapContext.lineWidth = 2;
+	mapContext.beginPath();
+	mapContext.arc(x, y, 5.5, 0, Math.PI * 2);
+	mapContext.fill();
+	mapContext.stroke();
+}
 
 // --- camera ---
-const camPos = new THREE.Vector3(0, 4, 40);
+const camPos = new THREE.Vector3(track.spawn.x, 3, track.spawn.z + 7);
 const camLook = new THREE.Vector3();
 function updateCamera(dt) {
 	const { look, up } = carAxes(car);
@@ -282,20 +384,25 @@ function updateCamera(dt) {
 	const fov = 62 + Math.min(14, car.speed * 0.25);
 	camera.fov += (fov - camera.fov) * Math.min(1, dt * 3);
 	camera.updateProjectionMatrix();
-	sun.position.set(pos.x + 25, 45, pos.z + 15);
-	sun.target.position.copy(pos);
+	aimSun(pos.x, pos.z);
+}
+function aimSun(x, z) {
+	sun.position.set(x + 58, 62, z - 42);
+	sun.target.position.set(x, 0, z);
 }
 
 // --- cones get knocked flying ---
 function updateCones(dt) {
 	const { look, right } = carAxes(car);
+	const halfLength = car.body[2] / 2 + 0.2;
+	const halfWidth = car.body[0] / 2 + 0.2;
 	for (const c of cones) {
 		const p = c.mesh.position;
 		if (!c.hit) {
 			const rel = [p.x - car.pos[0], 0, p.z - car.pos[2]];
 			const along = rel[0] * look[0] + rel[2] * look[2];
 			const across = rel[0] * right[0] + rel[2] * right[2];
-			if (Math.abs(along) < 2.4 && Math.abs(across) < 1.1) {
+			if (Math.abs(along) < halfLength && Math.abs(across) < halfWidth) {
 				finishScore(score, "Cone hit");
 				c.hit = true;
 				c.vel.set(car.vel[0] * 0.9 + (Math.random() - 0.5) * 2, 2 + Math.random() * 2, car.vel[2] * 0.9);
@@ -318,33 +425,78 @@ function updateCones(dt) {
 	}
 }
 
+// --- laps and clip zones ---
+const clock = (seconds) => {
+	if (seconds === null) return "--:--.-";
+	const m = Math.floor(seconds / 60);
+	const s = seconds - m * 60;
+	return `${m}:${s.toFixed(1).padStart(4, "0")}`;
+};
+function updateLap(dt) {
+	const earned = score.total + Math.floor(score.points); // a combo still running counts toward the lap
+	const event = stepLap(lap, track, car.pos[0], car.pos[2], car.speed, dt, earned);
+	if (event === "lap") flash(`LAP ${lap.lap} · ${clock(lap.last)}`);
+	if (event === "void") flash("Lap void · stay on the road");
+	if (score.active && Math.abs(car.driftAngle) >= CLIP_ANGLE) {
+		const zone = zoneAt(lap, track, car.pos[0], car.pos[2]);
+		if (zone && awardBonus(score, "Clip zone +300 × multiplier", 300)) {
+			lap.zonesDone.add(zone.id);
+			flash("CLIP ZONE");
+		}
+	}
+	$("wrong-way").style.display = lap.wrongWay ? "block" : "none";
+	$("lap-line").textContent = lap.running
+		? `LAP ${lap.lap + 1} ${clock(lap.time)} · BEST ${clock(lap.best)}${lap.valid ? "" : " · VOID"}`
+		: lap.best === null
+			? "Cross the start line to time a lap"
+			: `BEST LAP ${clock(lap.best)} · ${lap.bestScore.toLocaleString()} PTS`;
+}
+
 // --- main loop: fixed-rate physics, render every frame ---
 let accumulator = 0;
 let last = performance.now();
 let fpsTime = 0;
 let fpsFrames = 0;
-function frame(now) {
-	if (document.hidden) { last = now; requestAnimationFrame(frame); return; }
-	const dt = Math.min(0.1, (now - last) / 1000);
-	last = now;
-	input.update();
-	const controls = window.sandbox.override ?? input.controls;
+let turntable = -Math.PI / 2 - 0.7;
+let sparkWait = 0;
+
+function garageFrame(dt) {
+	turntable += dt * 0.32;
+	model.showParked(GARAGE.x, GARAGE.z, turntable, car);
+	camera.fov = 44;
+	camera.position.set(GARAGE.x + 9.5, 1.55, GARAGE.z + 2.6);
+	camera.lookAt(GARAGE.x, 0.72, GARAGE.z);
+	camera.updateProjectionMatrix();
+	aimSun(GARAGE.x, GARAGE.z);
+	sound.idle();
+}
+
+function driveFrame(dt, controls) {
 	accumulator += dt;
+	sparkWait -= dt;
 	while (accumulator >= PHYSICS_DT) {
-		stepCar(car, controls, tuning, PHYSICS_DT);
+		stepCar(car, controls, tuning, PHYSICS_DT, world);
+		const hit = collideCar(car, world, tuning.Mass);
+		if (hit && hit.impact > 1 && sparkWait <= 0) {
+			effects.sparks(hit.x, hit.z, Math.min(12, Math.ceil(hit.impact)));
+			sparkWait = 0.06;
+		}
+		if (hit && hit.impact > WALL_HIT) finishScore(score, "Wall hit");
 		stepScore(score, { ...car, up: carAxes(car).up[1] }, PHYSICS_DT);
 		accumulator -= PHYSICS_DT;
 	}
 	if (car.pos[1] < -20 || car.pos.some((n) => !Number.isFinite(n))) {
 		finishScore(score, "Car recovered");
-		resetCar(car, tuning);
+		placeCar(car, track.spawn.x, track.spawn.z, track.spawn.yaw);
 	}
 
 	model.update(car);
 	effects.update(car, dt);
 	updateCones(dt);
+	updateLap(dt);
 	updateCamera(dt);
-	sound.update(car, controls);
+	sound.update(car, controls, tuning.TopSpeed / CAR.TopSpeed);
+	drawMinimap();
 
 	$("speed").textContent = Math.round(car.speed * 3.6);
 	const angle = Math.abs(car.driftAngle);
@@ -357,11 +509,22 @@ function frame(now) {
 	$("best-score").textContent = score.best.toLocaleString();
 	$("combo-link").value = score.active ? 1 - score.grace / SCORE_RULES.linkTime : 0;
 	$("score-box").classList.toggle("scoring", score.active);
-	const feedback = score.resultTime > 0 && !score.active
+	// A lost combo stays on screen briefly even if the next drift has already started.
+	const feedback = score.resultTime > 0 && (!score.active || score.resultTime > 1.6)
 		? `${score.result.banked ? "BANKED" : "LOST"} ${score.result.points.toLocaleString()} · ${score.result.reason}`
 		: score.hint;
 	if ($("score-feedback").textContent !== feedback) $("score-feedback").textContent = feedback;
 	$("hint").textContent = HINTS[input.device];
+}
+
+function frame(now) {
+	if (document.hidden) { last = now; requestAnimationFrame(frame); return; }
+	const dt = Math.min(0.1, (now - last) / 1000);
+	last = now;
+	input.update();
+	if (mode === "garage") garageFrame(dt);
+	else driveFrame(dt, window.sandbox.override ?? input.controls);
+
 	if (flashTimer > 0 && (flashTimer -= dt) <= 0) $("flash").style.opacity = 0;
 	fpsFrames++;
 	if ((fpsTime += dt) > 0.5) {
@@ -373,6 +536,17 @@ function frame(now) {
 	requestAnimationFrame(frame);
 }
 
+// Runs the real drive loop without waiting for the screen, so tests work even when the page isn't being drawn.
+function advance(seconds, step = 1 / 60) {
+	for (let t = 0; t < seconds; t += step) {
+		input.update();
+		driveFrame(step, window.sandbox.override ?? input.controls);
+	}
+}
+
 // Debug hooks for testing from the browser console: sandbox.override = { throttle: 1, steer: 0, brake: 0, handbrake: false }
-window.sandbox = { car, tuning, score, override: null };
+window.sandbox = { car, tuning, score, lap, track, world, garage, openGarage, leaveGarage, garageUi, renderer, scene, camera, advance, sound, override: null };
+document.body.classList.add("garage");
+yard.garage.setLit(true);
+fitView();
 requestAnimationFrame(frame);

@@ -71,7 +71,7 @@ export const flatWorld = {
 	groundHeight: () => 0,
 };
 
-export function createCar(tuning, position = [0, 1, 0], yaw = 0) {
+export function createCar(tuning, position = [0, 1, 0], yaw = 0, wheels = WHEELS, body = BODY_SIZE) {
 	return {
 		pos: [...position],
 		vel: [0, 0, 0],
@@ -84,16 +84,27 @@ export function createCar(tuning, position = [0, 1, 0], yaw = 0) {
 		driftAngle: 0, // degrees, signed: + = sliding with the tail out to the left
 		grounded: false,
 		preset: DEFAULT_PRESET,
-		wheels: WHEELS.map((def) => ({
-			def,
-			lastCompression: 0,
-			spin: 0,
-			slip: 0,
-			grounded: false,
-			drop: tuning.SpringLength * (1 - tuning.StaticSag),
-			contact: null,
-		})),
+		body,
+		wheels: makeWheels(tuning, wheels),
 	};
+}
+
+function makeWheels(tuning, defs) {
+	return defs.map((def) => ({
+		def,
+		lastCompression: 0,
+		spin: 0,
+		slip: 0,
+		grounded: false,
+		drop: tuning.SpringLength * (1 - tuning.StaticSag),
+		contact: null,
+	}));
+}
+
+// Swap the wheel positions and body size when the player picks another car.
+export function fitCar(car, tuning, wheels, body) {
+	car.wheels = makeWheels(tuning, wheels);
+	car.body = body;
 }
 
 export function carToWorld(car, p) {
@@ -198,7 +209,7 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 		if (coasting && Math.abs(vLong) < 0.5) fLong -= sign(vLong) * stopLong; // parked cars stay parked
 
 		// Friction circle: grip spent on power/braking is gone from cornering (but never all of it).
-		let grip = def.front ? c.FrontGrip : c.RearGrip;
+		let grip = (def.front ? c.FrontGrip : c.RearGrip) * (hit.grip ?? 1);
 		if (controls.handbrake && !def.front) grip *= c.HandbrakeGrip;
 		const maxForce = grip * load;
 		fLong = clamp(fLong, -maxForce, maxForce);
@@ -223,7 +234,7 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 	force = add(force, scale(car.vel, -0.4 * length(car.vel))); // air drag
 
 	// Body scraping the ground (rollovers, big bumps): stiff spring + friction at the box corners.
-	const [hx, hy, hz] = BODY_SIZE.map((s) => s / 2);
+	const [hx, hy, hz] = car.body.map((s) => s / 2);
 	for (const sx of [-hx, hx])
 		for (const sy of [-hy, hy])
 			for (const sz of [-hz, hz]) {
@@ -238,7 +249,7 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 			}
 
 	// Integrate (semi-implicit Euler). Inertia of a solid box, in car space.
-	const [sx, sy, sz] = BODY_SIZE;
+	const [sx, sy, sz] = car.body;
 	const inertia = [(mass * (sy * sy + sz * sz)) / 12, (mass * (sx * sx + sz * sz)) / 12, (mass * (sx * sx + sy * sy)) / 12];
 	car.vel = add(car.vel, scale(force, dt / mass));
 	const localTorque = qRotate(qConj(car.quat), torque);
@@ -263,13 +274,20 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 	car.lateral = carRight; // for visuals
 }
 
+// Set the car down at a spot, stopped and on its wheels.
+export function placeCar(car, x, z, yaw) {
+	car.pos = [x, 1, z];
+	car.vel = [0, 0, 0];
+	car.angVel = [0, 0, 0];
+	car.quat = qFromYaw(yaw);
+	car.steer = 0;
+	car.steerAngle = 0;
+	for (const wheel of car.wheels) wheel.lastCompression = 0;
+}
+
 // Put the car back on its wheels, facing the way it was roughly pointing.
 export function resetCar(car, tuning) {
 	const { look } = carAxes(car);
 	const yaw = Math.atan2(-look[0], -look[2]);
-	car.pos = [car.pos[0], 1, car.pos[2]];
-	car.vel = [0, 0, 0];
-	car.angVel = [0, 0, 0];
-	car.quat = qFromYaw(Math.abs(look[0]) + Math.abs(look[2]) > 0.1 ? yaw : 0);
-	for (const wheel of car.wheels) wheel.lastCompression = 0;
+	placeCar(car, car.pos[0], car.pos[2], Math.abs(look[0]) + Math.abs(look[2]) > 0.1 ? yaw : 0);
 }

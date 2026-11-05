@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-		<title>SMOKE CULT · Drift Sandbox</title>
+		<title>SMOKE CULT</title>
 		<style>
 			:root {
 				--pink: #ff2aa0;
@@ -56,6 +56,60 @@
 			#touch-reset { right: 80px; }
 			#touch-cam { right: 144px; }
 			#touch-tune { right: 208px; }
+			#touch-garage { position: fixed; top: 10px; right: 72px; z-index: 3; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+				border: 1px solid rgba(255, 255, 255, 0.45); background: rgba(18, 8, 26, 0.72); color: #fff; font: 800 12px "Segoe UI", system-ui, sans-serif; letter-spacing: 0.08em; }
+			body.touch #touch-garage { top: 85px; right: 272px; width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 9px; letter-spacing: 0; }
+			#sound-btn { position: fixed; top: 10px; right: 168px; z-index: 3; padding: 7px 12px; border-radius: 6px; cursor: pointer;
+				border: 1px solid rgba(255, 255, 255, 0.45); background: rgba(18, 8, 26, 0.72); color: #fff; font: 800 12px "Segoe UI", system-ui, sans-serif; letter-spacing: 0.08em; }
+			#sound-btn.off { color: #ffb0b8; border-color: #d81830; }
+			body.touch #sound-btn { top: 6px; right: 8px; padding: 5px 9px; font-size: 10px; }
+			body.touch #fps { display: none; }
+			#lap-line { margin-top: 6px; font-size: 11px; font-weight: 700; color: #ffd23f; }
+			#minimap { top: 44px; right: 16px; width: 170px; height: 170px; opacity: 0.92; }
+			#wrong-way { display: none; top: 30%; left: 50%; transform: translateX(-50%); padding: 6px 18px; border-radius: 6px;
+				background: #d81830; font-size: 22px; font-weight: 900; letter-spacing: 0.1em; }
+			body.touch #minimap { top: 150px; right: 10px; width: 100px; height: 100px; }
+
+			#garage { display: none; position: fixed; z-index: 5; top: 0; bottom: 0; left: 0; width: min(410px, 100vw); padding: 18px 18px 16px;
+				flex-direction: column; gap: 8px; overflow-y: auto; touch-action: pan-y; background: linear-gradient(90deg, rgba(10, 4, 16, 0.94) 72%, rgba(10, 4, 16, 0)); }
+			body.garage #garage { display: flex; }
+			body.garage .hud, body.garage .touch-ui, body.garage #touch-garage, body.garage #sound-btn { display: none !important; }
+			#garage-brand { font-weight: 900; letter-spacing: 0.14em; font-size: 13px; opacity: 0.85; }
+			#garage-brand b { color: var(--pink); }
+			#garage-name { margin: 4px 0 0; font-size: 34px; line-height: 1.05; font-weight: 900; font-style: italic; }
+			#garage-tag { margin: 0; font-size: 13px; color: #d3b5dc; min-height: 18px; }
+			#garage-stats { display: grid; gap: 4px; margin: 4px 0; }
+			.gstat { display: grid; grid-template-columns: 82px 1fr; align-items: center; font-size: 10px; letter-spacing: 0.1em; color: #d3b5dc; }
+			.gstat i { display: block; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.13); overflow: hidden; }
+			.gstat u { display: block; height: 100%; background: linear-gradient(90deg, #ffd23f, var(--pink)); transition: width 0.25s; text-decoration: none; }
+			#garage-rows { display: grid; gap: 4px; }
+			.grow { display: grid; grid-template-columns: 92px 38px 1fr 38px; align-items: center; min-height: 40px; padding: 0 4px; border-radius: 6px;
+				border: 1px solid transparent; background: rgba(255, 255, 255, 0.05); }
+			.grow.focus { border-color: var(--pink); background: rgba(255, 42, 160, 0.14); }
+			.glabel { font-size: 10px; letter-spacing: 0.1em; color: #d3b5dc; padding-left: 6px; }
+			.garrow { height: 34px; border: 0; background: none; color: #fff; font-size: 24px; line-height: 1; cursor: pointer; }
+			.gvalue { display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 13px; text-align: center; }
+			.gswatch { width: 13px; height: 13px; flex: none; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.5); }
+			#garage-drive { position: sticky; bottom: 0; flex: none; margin-top: 4px; min-height: 48px; border: 0; border-radius: 6px; background: var(--pink); color: #fff; cursor: pointer;
+				font: 900 15px "Segoe UI", system-ui, sans-serif; letter-spacing: 0.08em; }
+			#garage-help { margin: 0; font-size: 11px; line-height: 1.4; color: #a78fb0; }
+			body.touch #garage-help { display: none; }
+			@media (orientation: portrait) {
+				#garage { top: auto; width: 100vw; height: 62vh; padding: 12px 14px; background: linear-gradient(0deg, rgba(10, 4, 16, 0.96) 90%, rgba(10, 4, 16, 0)); }
+				#garage-name { font-size: 25px; }
+				#garage-stats { grid-template-columns: 1fr 1fr; gap: 3px 12px; }
+				.gstat { grid-template-columns: 62px 1fr; font-size: 8px; }
+				.grow { min-height: 36px; }
+			}
+			@media (max-height: 500px) and (orientation: landscape) {
+				#garage { width: min(350px, 50vw); padding: 10px 12px; gap: 5px; }
+				#garage-name { font-size: 22px; }
+				#garage-tag { font-size: 11px; }
+				#garage-stats { display: none; }
+				.grow { min-height: 33px; grid-template-columns: 76px 32px 1fr 32px; }
+				.gvalue { font-size: 12px; }
+				#garage-drive { min-height: 40px; }
+			}
 			#tune { z-index: 10; width: min(330px, calc(100vw - 24px)); touch-action: pan-y; }
 			#tune input { touch-action: auto; }
 			#tune-close { float: right; }
@@ -68,7 +122,7 @@
 			#combo-link { width: 100%; height: 5px; display: block; margin: 4px 0 8px; accent-color: var(--pink); }
 			#score-feedback { min-height: 32px; font-size: 12px; line-height: 1.35; }
 			#score-totals { margin-top: 6px; font-size: 10px; color: #d3b5dc; }
-			body.touch #score-box { top: 155px; width: min(260px, 70vw); padding: 8px 10px; }
+			body.touch #score-box { top: 155px; width: min(260px, 62vw); padding: 8px 10px; }
 			body.touch #combo-score { font-size: 26px; }
 			body.touch #combo-multiplier { font-size: 18px; padding-top: 5px; }
 			body.touch #score-feedback { font-size: 11px; }
@@ -79,7 +133,10 @@
 			body.touch #hint { top: 42px; width: 95vw; max-width: 95vw; font-size: 10px; }
 			body.touch .tsmall { top: 85px; }
 			@media (max-height: 500px) {
-				body.touch #score-box { top: 155px; width: 220px; }
+				body.touch #score-box { top: 150px; width: 220px; }
+				body.touch #score-feedback { min-height: 0; }
+				body.touch #lap-line { margin-top: 3px; font-size: 10px; }
+				body.touch #minimap { top: 150px; left: 244px; right: auto; width: 84px; height: 84px; }
 				body.touch #score-totals { display: none; }
 				body.touch #dash { bottom: 12px; }
 				body.touch #preset-box { bottom: 6px; font-size: 10px; }
@@ -100,7 +157,7 @@
 	<body>
 		<div id="app"></div>
 
-		<div class="hud" id="title">SMOKE <b>CULT</b> · M1 test pad</div>
+		<div class="hud" id="title">SMOKE <b>CULT</b> · Rustline Yard</div>
 		<div class="hud" id="hint"></div>
 		<div class="hud" id="fps"></div>
 		<div class="hud" id="flash"></div>
@@ -111,13 +168,29 @@
 			<progress id="combo-link" max="1" value="0" aria-label="Time remaining to link another drift"></progress>
 			<div id="score-feedback">Build speed · 29 km/h to score</div>
 			<div id="score-totals">SESSION <span id="session-score">0</span> · BEST COMBO <span id="best-score">0</span></div>
+			<div id="lap-line"></div>
 		</section>
+		<canvas class="hud" id="minimap" width="220" height="220" aria-label="Track map"></canvas>
+		<div class="hud" id="wrong-way">WRONG WAY</div>
 		<div class="hud" id="dash">
 			<div id="angle"></div>
 			<div id="bar"><div id="angle-bar"></div></div>
 			<div id="speed">0</div>
 			<div id="unit">KM/H</div>
 		</div>
+
+		<button id="touch-garage">GARAGE</button>
+		<button id="sound-btn" aria-label="Turn sound on or off">SOUND ON</button>
+
+		<section id="garage" aria-label="Garage">
+			<div id="garage-brand">SMOKE <b>CULT</b> · GARAGE</div>
+			<h1 id="garage-name"></h1>
+			<p id="garage-tag"></p>
+			<div id="garage-stats"></div>
+			<div id="garage-rows"></div>
+			<button id="garage-drive" tabindex="-1"></button>
+			<p id="garage-help">Controller: D-pad or stick to choose, A to drive, View for tuning. Keyboard: arrows to choose, Enter to drive, Tab for tuning.</p>
+		</section>
 
 		<div id="tune">
 			<button id="tune-close" aria-label="Close tuning">Close</button>

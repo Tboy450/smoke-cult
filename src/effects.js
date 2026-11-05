@@ -31,7 +31,7 @@ export function createEffects(scene) {
 	const SKIDS = 6000;
 	const skidMesh = new THREE.InstancedMesh(
 		new THREE.PlaneGeometry(0.24, 1).rotateX(-Math.PI / 2),
-		new THREE.MeshBasicMaterial({ color: 0x050505, transparent: true, opacity: 0.55, depthWrite: false }),
+		new THREE.MeshBasicMaterial({ color: 0x050505, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -12 }),
 		SKIDS,
 	);
 	skidMesh.count = 0;
@@ -39,6 +39,8 @@ export function createEffects(scene) {
 	scene.add(skidMesh);
 	let nextSkid = 0;
 	const lastMark = {};
+	const smokeColor = new THREE.Color(0xe6e6ec);
+	const sparkColor = new THREE.Color(0xffb040);
 	const m = new THREE.Matrix4();
 	const q = new THREE.Quaternion();
 
@@ -57,6 +59,8 @@ export function createEffects(scene) {
 					const puff = puffs[nextPuff];
 					nextPuff = (nextPuff + 1) % puffs.length;
 					puff.life = puff.maxLife = 1.4 + Math.random() * 1.2;
+					puff.spark = false;
+					puff.sprite.material.color.copy(smokeColor);
 					puff.sprite.position.set(p.x, 0.35, p.z);
 					puff.vel.set((Math.random() - 0.5) * 1.2, 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * 1.2);
 					puff.sprite.visible = true;
@@ -83,9 +87,26 @@ export function createEffects(scene) {
 				const t = 1 - puff.life / puff.maxLife;
 				puff.sprite.position.addScaledVector(puff.vel, dt);
 				puff.vel.multiplyScalar(1 - dt * 0.8);
-				puff.sprite.scale.setScalar(0.8 + t * 5);
-				puff.sprite.material.opacity = 0.55 * (1 - t);
+				puff.sprite.scale.setScalar(puff.spark ? 0.28 * (1 - t) + 0.04 : 0.8 + t * 5);
+				puff.sprite.material.opacity = (puff.spark ? 1 : 0.55) * (1 - t);
+				if (puff.spark) puff.vel.y -= 9.81 * dt;
 				if (puff.life <= 0) puff.sprite.visible = false;
+			}
+		},
+		setSmokeColor(color) {
+			smokeColor.setHex(color);
+		},
+		// A shower of sparks where the car touches a wall.
+		sparks(x, z, amount) {
+			for (let i = 0; i < amount; i++) {
+				const puff = puffs[nextPuff];
+				nextPuff = (nextPuff + 1) % puffs.length;
+				puff.spark = true;
+				puff.life = puff.maxLife = 0.25 + Math.random() * 0.35;
+				puff.sprite.material.color.copy(sparkColor);
+				puff.sprite.position.set(x, 0.4 + Math.random() * 0.4, z);
+				puff.vel.set((Math.random() - 0.5) * 12, 1 + Math.random() * 4, (Math.random() - 0.5) * 12);
+				puff.sprite.visible = true;
 			}
 		},
 		clearSkids() {

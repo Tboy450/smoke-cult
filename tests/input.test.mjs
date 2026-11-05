@@ -6,7 +6,7 @@ test('controls release on focus/capture loss, survive reconnects and work around
   const win = new EventTarget();
   const doc = new EventTarget();
   const elements = new Map();
-  for (const id of ['touch-steer', 'touch-gas', 'touch-brake', 'touch-hb', 'touch-preset', 'touch-reset', 'touch-cam', 'touch-tune']) {
+  for (const id of ['touch-steer', 'touch-gas', 'touch-brake', 'touch-hb', 'touch-preset', 'touch-reset', 'touch-cam', 'touch-tune', 'touch-garage']) {
     const element = new EventTarget();
     element.setPointerCapture = () => {};
     elements.set(id, element);
@@ -24,8 +24,11 @@ test('controls release on focus/capture loss, survive reconnects and work around
   let blocked = false;
   let tunes = 0;
   let lastController = null;
+  let garages = 0;
+  let menuOpen = false;
+  const menu = [];
   try {
-    const input = createInput({ onPreset() {}, onReset() {}, onCamera() {}, onMute() {}, onTune() { tunes++; }, onController(standard) { lastController = standard; }, isTouchBlocked: () => blocked });
+    const input = createInput({ onPreset() {}, onReset() {}, onCamera() {}, onMute() {}, onTune() { tunes++; }, onGarage() { garages++; }, onMenu(dx, dy, action) { menu.push(action ?? `${dx},${dy}`); }, isMenuOpen: () => menuOpen, onController(standard) { lastController = standard; }, isTouchBlocked: () => blocked });
     emit(win, 'keydown', { code: 'KeyW' });
     input.update(); assert.equal(input.controls.throttle, 1);
     emit(win, 'blur'); input.update(); assert.equal(input.controls.throttle, 0);
@@ -47,12 +50,12 @@ test('controls release on focus/capture loss, survive reconnects and work around
     emit(elements.get('touch-tune'), 'click'); assert.equal(tunes, 1);
     const pad = { index: 0, id: 'test', mapping: 'standard', axes: [0.7], buttons: Array.from({ length: 16 }, () => ({ value: 0, pressed: false })) };
     pad.buttons[7] = { value: 0.75, pressed: true };
-    pad.buttons[9] = { value: 1, pressed: true };
+    pad.buttons[8] = { value: 1, pressed: true };
     pads = [pad]; input.update();
     assert.equal(input.controls.throttle, 0.75); assert.equal(tunes, 2);
-    input.update(); assert.equal(tunes, 2, 'held Menu fires once');
+    input.update(); assert.equal(tunes, 2, 'held View fires once');
     pads = []; input.update(); assert.equal(input.controls.throttle, 0);
-    pads = [pad]; input.update(); assert.equal(tunes, 3, 'reconnected Menu works');
+    pads = [pad]; input.update(); assert.equal(tunes, 3, 'reconnected View works');
 
     // Tuning open: touch stops driving (the panel covers it), keyboard and controller keep driving.
     pads = []; input.update();
@@ -96,6 +99,39 @@ test('controls release on focus/capture loss, survive reconnects and work around
     assert.equal(input.controls.steer, 0, 'phantom device alone is ignored');
     pads = [pad]; input.update();
     assert.equal(lastController, true, 'standard pad reported');
+
+    // The garage: opens from every device, and takes over the controls while it's open.
+    pads = [];
+    input.update();
+    emit(win, 'keydown', { code: 'KeyG' }); assert.equal(garages, 1);
+    emit(win, 'keyup', { code: 'KeyG' });
+    emit(elements.get('touch-garage'), 'click'); assert.equal(garages, 2);
+    const openPad = { index: 0, id: 'menu-pad', mapping: 'standard', axes: [0, 0], buttons: Array.from({ length: 16 }, () => ({ value: 0, pressed: false })) };
+    openPad.buttons[9] = { value: 1, pressed: true };
+    pads = [openPad]; input.update(); assert.equal(garages, 3, 'controller Menu opens the garage');
+    menuOpen = true;
+    openPad.buttons[9] = { value: 0, pressed: false };
+    input.update();
+
+    emit(win, 'keydown', { code: 'KeyW', preventDefault() {} });
+    emit(win, 'keydown', { code: 'ArrowRight', preventDefault() {} });
+    emit(win, 'keydown', { code: 'Enter', preventDefault() {} });
+    emit(win, 'keydown', { code: 'Escape', preventDefault() {} });
+    assert.deepEqual(menu, ['0,-1', '1,0', 'confirm', 'back']);
+    menu.length = 0;
+    input.update();
+    assert.deepEqual(input.controls, { throttle: 0, brake: 0, steer: 0, handbrake: false }, 'keys in the garage never drive');
+
+    openPad.buttons[15] = { value: 1, pressed: true }; input.update();
+    openPad.buttons[15] = { value: 0, pressed: false }; input.update();
+    openPad.axes[1] = 0.9; input.update(); input.update();
+    openPad.axes[1] = 0; input.update();
+    openPad.buttons[0] = { value: 1, pressed: true }; input.update();
+    openPad.buttons[0] = { value: 0, pressed: false }; openPad.buttons[1] = { value: 1, pressed: true }; input.update();
+    assert.deepEqual(menu, ['1,0', '0,1', 'confirm', 'back'], 'controller moves once per press, stick included');
+    openPad.buttons[7] = { value: 1, pressed: true }; input.update();
+    assert.equal(input.controls.throttle, 0, 'triggers do not drive in the garage');
+    menuOpen = false;
   } finally {
     globalThis.document = oldDocument;
     globalThis.addEventListener = oldAdd;
