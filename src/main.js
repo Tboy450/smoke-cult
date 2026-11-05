@@ -124,7 +124,9 @@ const input = createInput({
 	},
 	onTune: () => $("tune").classList.toggle("open"),
 	onMute: () => sound.toggle(),
-	isDrivingBlocked: () => $("tune").classList.contains("open"),
+	onController: (standard) => flash(standard ? "Controller connected" : "Controller connected (basic mode)"),
+	// The open panel covers the touch controls. Keyboard and controller keep driving so changes can be felt live.
+	isTouchBlocked: () => $("tune").classList.contains("open"),
 });
 
 let flashTimer = 0;
@@ -137,6 +139,10 @@ function flash(text) {
 // --- tuning panel ---
 const tuneRows = $("tune-rows");
 $("tune-close").addEventListener("click", () => $("tune").classList.remove("open"));
+// Sliders and buttons hand keyboard focus back after use, so Space and the arrow keys drive straight away.
+const releaseFocus = () => document.activeElement?.blur?.();
+document.addEventListener("change", releaseFocus);
+document.addEventListener("click", releaseFocus);
 for (const [name, [min, max, step]] of Object.entries(RANGES)) {
 	const row = document.createElement("label");
 	row.innerHTML = `<span>${name}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;

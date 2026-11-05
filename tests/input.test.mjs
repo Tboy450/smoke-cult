@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createInput } from '../src/input.js';
 
-test('controls release on focus/capture loss and survive controller reconnect', () => {
+test('controls release on focus/capture loss, survive reconnects and work around the tuning panel', () => {
   const win = new EventTarget();
   const doc = new EventTarget();
   const elements = new Map();
@@ -23,8 +23,9 @@ test('controls release on focus/capture loss and survive controller reconnect', 
   const emit = (target, type, values = {}) => target.dispatchEvent(Object.assign(new Event(type), values));
   let blocked = false;
   let tunes = 0;
+  let lastController = null;
   try {
-    const input = createInput({ onPreset() {}, onReset() {}, onCamera() {}, onMute() {}, onTune() { tunes++; }, isDrivingBlocked: () => blocked });
+    const input = createInput({ onPreset() {}, onReset() {}, onCamera() {}, onMute() {}, onTune() { tunes++; }, onController(standard) { lastController = standard; }, isTouchBlocked: () => blocked });
     emit(win, 'keydown', { code: 'KeyW' });
     input.update(); assert.equal(input.controls.throttle, 1);
     emit(win, 'blur'); input.update(); assert.equal(input.controls.throttle, 0);
@@ -52,8 +53,49 @@ test('controls release on focus/capture loss and survive controller reconnect', 
     input.update(); assert.equal(tunes, 2, 'held Menu fires once');
     pads = []; input.update(); assert.equal(input.controls.throttle, 0);
     pads = [pad]; input.update(); assert.equal(tunes, 3, 'reconnected Menu works');
+
+    // Tuning open: touch stops driving (the panel covers it), keyboard and controller keep driving.
+    pads = []; input.update();
+    emit(gas, 'pointerdown', { pointerId: 4 });
+    input.update(); assert.equal(input.controls.throttle, 1);
     blocked = true; input.update();
-    assert.deepEqual(input.controls, { throttle: 0, brake: 0, steer: 0, handbrake: false });
+    assert.equal(input.controls.throttle, 0, 'held touch releases when tuning opens');
+    emit(gas, 'pointerdown', { pointerId: 5 }); input.update();
+    assert.equal(input.controls.throttle, 0, 'touch ignored while tuning');
+    emit(win, 'keydown', { code: 'KeyW' }); input.update();
+    assert.equal(input.controls.throttle, 1, 'keyboard drives while tuning');
+    emit(win, 'keyup', { code: 'KeyW' });
+    pads = [pad]; input.update();
+    assert.equal(input.controls.throttle, 0.75, 'controller drives while tuning');
+    pads = []; input.update(); blocked = false;
+
+    // Keys pressed while a slider or button still has focus.
+    const slider = { closest: () => slider };
+    const fromSlider = (code) => {
+      const event = Object.assign(new Event('keydown'), { code, preventDefault() {} });
+      Object.defineProperty(event, 'target', { value: slider });
+      win.dispatchEvent(event);
+    };
+    const tunesBefore = tunes;
+    fromSlider('Tab'); assert.equal(tunes, tunesBefore + 1, 'Tab closes the panel from a slider');
+    fromSlider('KeyW'); input.update(); assert.equal(input.controls.throttle, 1, 'letter keys still drive');
+    emit(win, 'keyup', { code: 'KeyW' });
+    fromSlider('ArrowLeft'); fromSlider('Space'); input.update();
+    assert.equal(input.controls.steer, 0, 'arrows stay with the slider');
+    assert.equal(input.controls.handbrake, false, 'Space stays with the focused control');
+
+    // Controllers the browser does not call "standard".
+    const basic = { index: 1, id: 'bluetooth', mapping: '', axes: [0, 0], buttons: Array.from({ length: 10 }, () => ({ value: 0, pressed: false })) };
+    basic.buttons[7] = { value: 1, pressed: true };
+    const phantom = { index: 0, id: 'not-a-pad', mapping: '', axes: [1], buttons: [] };
+    pads = [null, phantom, basic]; input.update();
+    assert.equal(input.controls.throttle, 1, 'non-standard pad drives');
+    assert.equal(input.controls.steer, 0, 'phantom device does not steer');
+    assert.equal(lastController, false, 'reported as basic mode');
+    pads = [phantom]; input.update();
+    assert.equal(input.controls.steer, 0, 'phantom device alone is ignored');
+    pads = [pad]; input.update();
+    assert.equal(lastController, true, 'standard pad reported');
   } finally {
     globalThis.document = oldDocument;
     globalThis.addEventListener = oldAdd;

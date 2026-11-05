@@ -9,7 +9,7 @@ Do not open `index.html` directly: browser security can block its JavaScript mod
 Use a launcher, `node server.mjs`, or the hosted GitHub Pages site instead.
 
 Controls: W/S gas and brake, A/D steering, Space handbrake, T assist, R reset, C camera,
-Tab tuning. Standard controllers: RT/LT gas/brake, left stick steer, A/X handbrake,
+Tab tuning (keyboard and controller keep driving while it is open, so you can feel changes live). Controllers: RT/LT gas/brake, left stick steer, A/X handbrake,
 D-pad Up assist, D-pad Down reset, Y camera, Menu/View tuning. Phones: drag left to steer,
 use pedals on the right and TUNE for settings.
 
