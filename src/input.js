@@ -1,6 +1,7 @@
 // Keyboard, controller (Gamepad API) and touch, merged into one set of controls.
 
 const DEADZONE = 0.12;
+export const TOUCH_LAYOUT_QUERY = "(any-pointer: coarse), (max-width: 700px), (max-width: 950px) and (max-height: 500px)";
 
 function shapeStick(x) {
 	const m = Math.abs(x);
@@ -11,7 +12,7 @@ function shapeStick(x) {
 export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onController = () => {}, isTouchBlocked = () => false }) {
 	const keys = new Set();
 	const touch = { gas: false, brake: false, handbrake: false, steer: 0 };
-	let device = typeof matchMedia === "function" && matchMedia("(any-pointer: coarse), (max-width: 700px)").matches ? "touch" : "keyboard";
+	let device = typeof matchMedia === "function" && matchMedia(TOUCH_LAYOUT_QUERY).matches ? "touch" : "keyboard";
 	let padWas = {};
 	let padId = null;
 	let active = true;

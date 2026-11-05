@@ -3,10 +3,11 @@
 import * as THREE from "three";
 import { createCarModel } from "./carModel.js";
 import { createEffects } from "./effects.js";
-import { createInput } from "./input.js";
+import { createInput, TOUCH_LAYOUT_QUERY } from "./input.js";
 import { createCar, resetCar, stepCar, carAxes } from "./physics.js";
 import { CAR, PRESET_ORDER, RANGES } from "./tuning.js";
 import { createTuningPanel } from "./tuningPanel.js";
+import { createScore, stepScore, finishScore, SCORE_RULES } from "./scoring.js";
 
 const PHYSICS_DT = 1 / 240;
 const tuning = { ...CAR };
@@ -87,6 +88,7 @@ for (let i = 0; i < 16; i++) {
 // --- car ---
 const SPAWN = [0, 1, 30];
 const car = createCar(tuning, SPAWN, 0);
+const score = createScore();
 const model = createCarModel(scene, tuning);
 const effects = createEffects(scene);
 
@@ -97,7 +99,7 @@ const HINTS = {
 	gamepad: "RT gas · LT brake/reverse · Left stick steer · A/X handbrake · D-pad ↑ assist · D-pad ↓ reset · Y camera · Menu tuning",
 	touch: "Drag left side to steer · GAS / BRAKE / HB on the right · TUNE for settings",
 };
-const touchLayout = matchMedia("(any-pointer: coarse), (max-width: 700px)");
+const touchLayout = matchMedia(TOUCH_LAYOUT_QUERY);
 const syncTouchLayout = () => document.body.classList.toggle("touch", touchLayout.matches);
 syncTouchLayout();
 touchLayout.addEventListener("change", syncTouchLayout);
@@ -108,10 +110,12 @@ const cycle = (list, current) => list[(list.indexOf(current) + 1) % list.length]
 const tuningPanel = createTuningPanel($("tune"), $("tune-close"));
 const input = createInput({
 	onPreset: () => {
+		finishScore(score, "Assist changed");
 		car.preset = cycle(PRESET_ORDER, car.preset);
 		syncPresetButtons();
 	},
 	onReset: () => {
+		finishScore(score, "Car reset");
 		resetCar(car, tuning);
 		effects.clearSkids();
 		for (const c of cones) {
@@ -163,6 +167,7 @@ for (const name of PRESET_ORDER) {
 	b.textContent = name;
 	b.dataset.preset = name;
 	b.addEventListener("click", () => {
+		if (car.preset !== name) finishScore(score, "Assist changed");
 		car.preset = name;
 		syncPresetButtons();
 	});
@@ -291,6 +296,7 @@ function updateCones(dt) {
 			const along = rel[0] * look[0] + rel[2] * look[2];
 			const across = rel[0] * right[0] + rel[2] * right[2];
 			if (Math.abs(along) < 2.4 && Math.abs(across) < 1.1) {
+				finishScore(score, "Cone hit");
 				c.hit = true;
 				c.vel.set(car.vel[0] * 0.9 + (Math.random() - 0.5) * 2, 2 + Math.random() * 2, car.vel[2] * 0.9);
 				c.spin.set(Math.random() * 10, Math.random() * 6, Math.random() * 10);
@@ -318,6 +324,7 @@ let last = performance.now();
 let fpsTime = 0;
 let fpsFrames = 0;
 function frame(now) {
+	if (document.hidden) { last = now; requestAnimationFrame(frame); return; }
 	const dt = Math.min(0.1, (now - last) / 1000);
 	last = now;
 	input.update();
@@ -325,9 +332,13 @@ function frame(now) {
 	accumulator += dt;
 	while (accumulator >= PHYSICS_DT) {
 		stepCar(car, controls, tuning, PHYSICS_DT);
+		stepScore(score, { ...car, up: carAxes(car).up[1] }, PHYSICS_DT);
 		accumulator -= PHYSICS_DT;
 	}
-	if (car.pos[1] < -20 || car.pos.some(Number.isNaN)) resetCar(car, tuning);
+	if (car.pos[1] < -20 || car.pos.some((n) => !Number.isFinite(n))) {
+		finishScore(score, "Car recovered");
+		resetCar(car, tuning);
+	}
 
 	model.update(car);
 	effects.update(car, dt);
@@ -340,6 +351,16 @@ function frame(now) {
 	$("angle").textContent = angle > 5 ? `${Math.round(angle)}°` : "";
 	$("angle-bar").style.width = `${Math.min(100, (angle / 70) * 100)}%`;
 	$("preset").textContent = car.preset;
+	$("combo-score").textContent = Math.floor(score.points).toLocaleString();
+	$("combo-multiplier").textContent = `×${score.multiplier.toFixed(2)}`;
+	$("session-score").textContent = score.total.toLocaleString();
+	$("best-score").textContent = score.best.toLocaleString();
+	$("combo-link").value = score.active ? 1 - score.grace / SCORE_RULES.linkTime : 0;
+	$("score-box").classList.toggle("scoring", score.active);
+	const feedback = score.resultTime > 0 && !score.active
+		? `${score.result.banked ? "BANKED" : "LOST"} ${score.result.points.toLocaleString()} · ${score.result.reason}`
+		: score.hint;
+	if ($("score-feedback").textContent !== feedback) $("score-feedback").textContent = feedback;
 	$("hint").textContent = HINTS[input.device];
 	if (flashTimer > 0 && (flashTimer -= dt) <= 0) $("flash").style.opacity = 0;
 	fpsFrames++;
@@ -353,5 +374,5 @@ function frame(now) {
 }
 
 // Debug hooks for testing from the browser console: sandbox.override = { throttle: 1, steer: 0, brake: 0, handbrake: false }
-window.sandbox = { car, tuning, override: null };
+window.sandbox = { car, tuning, score, override: null };
 requestAnimationFrame(frame);

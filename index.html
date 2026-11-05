@@ -59,6 +59,19 @@
 			#tune { z-index: 10; width: min(330px, calc(100vw - 24px)); touch-action: pan-y; }
 			#tune input { touch-action: auto; }
 			#tune-close { float: right; }
+			#score-box { top: 85px; left: 16px; width: 260px; padding: 12px 14px; border-left: 3px solid #74537d;
+				background: rgba(18, 8, 26, .8); border-radius: 0 8px 8px 0; font-variant-numeric: tabular-nums; }
+			#score-box.scoring { border-color: var(--pink); }
+			.score-label { font-size: 10px; letter-spacing: .13em; color: #d3b5dc; }
+			#combo-score { font-size: 32px; font-weight: 900; }
+			#combo-multiplier { float: right; color: #ffd23f; font-size: 22px; font-weight: 800; padding-top: 8px; }
+			#combo-link { width: 100%; height: 5px; display: block; margin: 4px 0 8px; accent-color: var(--pink); }
+			#score-feedback { min-height: 32px; font-size: 12px; line-height: 1.35; }
+			#score-totals { margin-top: 6px; font-size: 10px; color: #d3b5dc; }
+			body.touch #score-box { top: 155px; width: min(260px, 70vw); padding: 8px 10px; }
+			body.touch #combo-score { font-size: 26px; }
+			body.touch #combo-multiplier { font-size: 18px; padding-top: 5px; }
+			body.touch #score-feedback { font-size: 11px; }
 			body.touch #dash { bottom: 145px; }
 			body.touch #bar { width: 130px; }
 			body.touch #speed { font-size: 36px; }
@@ -66,6 +79,8 @@
 			body.touch #hint { top: 42px; width: 95vw; max-width: 95vw; font-size: 10px; }
 			body.touch .tsmall { top: 85px; }
 			@media (max-height: 500px) {
+				body.touch #score-box { top: 155px; width: 220px; }
+				body.touch #score-totals { display: none; }
 				body.touch #dash { bottom: 12px; }
 				body.touch #preset-box { bottom: 6px; font-size: 10px; }
 				#touch-gas { width: 80px; height: 80px; right: 12px; bottom: 14px; }
@@ -90,6 +105,13 @@
 		<div class="hud" id="fps"></div>
 		<div class="hud" id="flash"></div>
 		<div class="hud" id="preset-box">ASSIST <span id="preset"></span></div>
+		<section class="hud" id="score-box" aria-label="Drift scoring">
+			<div class="score-label">DRIFT COMBO</div>
+			<span id="combo-score">0</span><span id="combo-multiplier">×1.00</span>
+			<progress id="combo-link" max="1" value="0" aria-label="Time remaining to link another drift"></progress>
+			<div id="score-feedback">Build speed · 29 km/h to score</div>
+			<div id="score-totals">SESSION <span id="session-score">0</span> · BEST COMBO <span id="best-score">0</span></div>
+		</section>
 		<div class="hud" id="dash">
 			<div id="angle"></div>
 			<div id="bar"><div id="angle-bar"></div></div>

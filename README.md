@@ -13,6 +13,11 @@ Tab tuning (keyboard and controller keep driving while it is open, so you can fe
 D-pad Up assist, D-pad Down reset, Y camera, Menu/View tuning. Phones: drag left to steer,
 use pedals on the right and TUNE for settings.
 
-Tests: `node --test tests/input.test.mjs tests/server.test.mjs` then `node tests/physics-check.mjs`.
+Drift scoring starts at 12° and 29 km/h. Angle and speed earn points; sustained drifts build a multiplier
+up to ×3. Link another drift within 1.5 seconds to keep the combo. Clean side changes earn a bonus.
+Straightening or slowing down banks your points after that grace period. Spinouts, cone hits, resets,
+and assist changes lose the pending combo. Banked totals and best combo last for the current page session.
+
+Tests: `node --test tests/*.test.mjs` then `node tests/physics-check.mjs`.
 No real controller or phone has been tested yet. This is an early sandbox with placeholder models;
-scoring and maps are still in development.
+maps and further scoring features (proximity and tandem) are still in development.
