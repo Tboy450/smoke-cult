@@ -1,0 +1,138 @@
+// Keyboard, controller (Gamepad API, standard layout) and touch, merged into one set of controls.
+
+const DEADZONE = 0.12;
+
+function shapeStick(x) {
+	const m = Math.abs(x);
+	if (m < DEADZONE) return 0;
+	return Math.sign(x) * ((m - DEADZONE) / (1 - DEADZONE)) ** 1.4;
+}
+
+export function createInput({ onPreset, onReset, onCamera, onTune, onMute, isDrivingBlocked = () => false }) {
+	const keys = new Set();
+	const touch = { gas: false, brake: false, handbrake: false, steer: 0 };
+	let device = typeof matchMedia === "function" && matchMedia("(any-pointer: coarse), (max-width: 700px)").matches ? "touch" : "keyboard";
+	let padWas = {};
+	let padId = null;
+	let active = true;
+	const heldButtons = new Map();
+	let steerId = null;
+	const clear = () => {
+		keys.clear();
+		touch.gas = touch.brake = touch.handbrake = false;
+		touch.steer = 0;
+		steerId = null;
+		heldButtons.clear();
+	};
+
+	addEventListener("keydown", (e) => {
+		if (e.repeat) return;
+		if (e.target?.closest?.("input, textarea, select, button")) return;
+		if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+		keys.add(e.code);
+		device = "keyboard";
+		if (e.code === "KeyT") onPreset();
+		if (e.code === "KeyR") onReset();
+		if (e.code === "KeyC") onCamera();
+		if (e.code === "KeyM") onMute();
+		if (e.code === "Tab") {
+			e.preventDefault();
+			onTune();
+		}
+		if (e.code === "Space") e.preventDefault();
+	});
+	addEventListener("keyup", (e) => keys.delete(e.code));
+	addEventListener("blur", () => { active = false; clear(); });
+	addEventListener("focus", () => { active = true; });
+	document.addEventListener("visibilitychange", () => { if (document.hidden) clear(); });
+
+	// Touch: drag anywhere on the left half to steer; buttons on the right.
+	const steerZone = document.getElementById("touch-steer");
+	let steerStartX = 0;
+	steerZone?.addEventListener("pointerdown", (e) => {
+		if (steerId !== null || isDrivingBlocked()) return;
+		steerId = e.pointerId;
+		steerStartX = e.clientX;
+		steerZone.setPointerCapture(e.pointerId);
+		device = "touch";
+	});
+	steerZone?.addEventListener("pointermove", (e) => {
+		if (e.pointerId === steerId) touch.steer = Math.max(-1, Math.min(1, (e.clientX - steerStartX) / 90));
+	});
+	const endSteer = (e) => {
+		if (e.pointerId === steerId) {
+			steerId = null;
+			touch.steer = 0;
+		}
+	};
+	steerZone?.addEventListener("pointerup", endSteer);
+	steerZone?.addEventListener("pointercancel", endSteer);
+	steerZone?.addEventListener("lostpointercapture", endSteer);
+	for (const [id, key] of [["touch-gas", "gas"], ["touch-brake", "brake"], ["touch-hb", "handbrake"]]) {
+		const b = document.getElementById(id);
+		b?.addEventListener("pointerdown", (e) => {
+			if (isDrivingBlocked()) return;
+			if (!heldButtons.has(key)) heldButtons.set(key, new Set());
+			heldButtons.get(key).add(e.pointerId);
+			touch[key] = true;
+			device = "touch";
+			b.setPointerCapture(e.pointerId);
+		});
+		for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) b?.addEventListener(ev, (e) => {
+			heldButtons.get(key)?.delete(e.pointerId);
+			touch[key] = (heldButtons.get(key)?.size ?? 0) > 0;
+		});
+	}
+	for (const [id, fn] of [["touch-preset", onPreset], ["touch-reset", onReset], ["touch-cam", onCamera], ["touch-tune", onTune]]) {
+		document.getElementById(id)?.addEventListener("click", fn);
+	}
+
+	const controls = { throttle: 0, brake: 0, steer: 0, handbrake: false };
+	const down = (...codes) => codes.some((c) => keys.has(c));
+
+	return {
+		controls,
+		get device() {
+			return device;
+		},
+		touch,
+		update() {
+			if (!active || document.hidden) {
+				Object.assign(controls, { throttle: 0, brake: 0, steer: 0, handbrake: false });
+				return;
+			}
+			let padSteer = 0;
+			let padGas = 0;
+			let padBrake = 0;
+			let padHandbrake = false;
+			const pads = navigator.getGamepads?.() ?? [];
+			const pad = Array.from(pads).find((p) => p && p.mapping === "standard");
+			const nextPadId = pad ? `${pad.index}:${pad.id}` : null;
+			if (nextPadId !== padId) { padWas = {}; padId = nextPadId; }
+			if (pad) {
+				const b = (i) => pad.buttons[i] ?? { value: 0, pressed: false };
+				padSteer = shapeStick(pad.axes[0] ?? 0);
+				padGas = b(7).value;
+				padBrake = b(6).value;
+				padHandbrake = b(0).pressed || b(2).pressed;
+				const pressedNow = (i) => b(i).pressed && !padWas[i];
+				if (pressedNow(12)) onPreset(); // D-pad up
+				if (pressedNow(13)) onReset(); // D-pad down
+				if (pressedNow(3)) onCamera(); // Y
+				if (pressedNow(8) || pressedNow(9)) onTune(); // View / Menu
+				for (let i = 0; i < pad.buttons.length; i++) padWas[i] = pad.buttons[i].pressed;
+				if (padSteer || padGas > 0.05 || padBrake > 0.05 || padHandbrake) device = "gamepad";
+			}
+			if (isDrivingBlocked()) {
+				clear();
+				Object.assign(controls, { throttle: 0, brake: 0, steer: 0, handbrake: false });
+				return;
+			}
+			const keySteer = (down("KeyD", "ArrowRight") ? 1 : 0) - (down("KeyA", "ArrowLeft") ? 1 : 0);
+			controls.steer = keySteer || padSteer || touch.steer;
+			controls.throttle = Math.max(down("KeyW", "ArrowUp") ? 1 : 0, padGas, touch.gas ? 1 : 0);
+			controls.brake = Math.max(down("KeyS", "ArrowDown") ? 1 : 0, padBrake, touch.brake ? 1 : 0);
+			controls.handbrake = down("Space") || padHandbrake || touch.handbrake;
+		},
+	};
+}

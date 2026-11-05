@@ -1,0 +1,9 @@
+{
+  "name": "drift-sandbox",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/*.test.mjs && node tests/physics-check.mjs"
+  }
+}

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<title>SMOKE CULT · Drift Sandbox</title>
+		<style>
+			:root {
+				--pink: #ff2aa0;
+				--ink: #fff;
+				--panel: rgba(12, 6, 18, 0.82);
+			}
+			* { box-sizing: border-box; }
+			html, body { margin: 0; height: 100%; overflow: hidden; background: #12081a; color: var(--ink);
+				font-family: "Segoe UI", system-ui, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+			#app canvas { display: block; }
+			.hud { position: fixed; pointer-events: none; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); }
+			#title { top: 14px; left: 16px; font-weight: 900; letter-spacing: 0.12em; font-size: 14px; opacity: 0.85; }
+			#title b { color: var(--pink); }
+			#hint { top: 40px; left: 50%; transform: translateX(-50%); font-size: 13px; opacity: 0.8; max-width: 80vw; text-align: center; }
+			#fps { top: 14px; right: 16px; font-size: 12px; opacity: 0.6; }
+			#dash { bottom: 22px; left: 50%; transform: translateX(-50%); text-align: center; }
+			#angle { font-size: 44px; font-weight: 900; color: var(--pink); height: 52px; font-style: italic; }
+			#bar { width: 260px; height: 6px; background: rgba(255, 255, 255, 0.15); border-radius: 3px; margin: 2px auto 8px; overflow: hidden; }
+			#angle-bar { height: 100%; width: 0; background: linear-gradient(90deg, #ffd23f, var(--pink)); }
+			#speed { font-size: 56px; font-weight: 900; line-height: 1; }
+			#unit { font-size: 13px; opacity: 0.7; letter-spacing: 0.2em; }
+			#preset-box { bottom: 26px; left: 18px; font-size: 13px; letter-spacing: 0.1em; opacity: 0.85; }
+			#preset { color: var(--pink); font-weight: 800; }
+			#flash { top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 30px; font-weight: 900; opacity: 0;
+				transition: opacity 0.3s; letter-spacing: 0.1em; }
+
+			#tune { position: fixed; top: 44px; right: 12px; width: 330px; max-height: calc(100vh - 60px); overflow: auto;
+				background: var(--panel); border: 1px solid rgba(255, 42, 160, 0.4); border-radius: 10px; padding: 12px;
+				display: none; font-size: 12px; }
+			#tune.open { display: block; }
+			#tune h2 { margin: 0 0 8px; font-size: 14px; letter-spacing: 0.1em; color: var(--pink); }
+			#tune label { display: grid; grid-template-columns: 120px 1fr 48px; gap: 6px; align-items: center; margin: 3px 0; }
+			#tune output { text-align: right; font-variant-numeric: tabular-nums; }
+			#tune input { width: 100%; accent-color: var(--pink); }
+			#tune button { background: #2a1838; color: var(--ink); border: 1px solid #503a60; border-radius: 6px;
+				padding: 5px 10px; margin: 0 4px 6px 0; cursor: pointer; font: inherit; }
+			#tune button.on { background: var(--pink); border-color: var(--pink); }
+
+			.touch-ui { display: none; }
+			body.touch .touch-ui { display: block; }
+			body.touch #hint { font-size: 11px; }
+			#touch-steer { position: fixed; left: 0; top: 30%; bottom: 0; width: 45%; }
+			.tbtn { position: fixed; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.5); color: #fff; font-weight: 900;
+				display: flex; align-items: center; justify-content: center; font-size: 15px; background: rgba(0, 0, 0, 0.35); }
+			#touch-gas { right: 18px; bottom: 26px; width: 110px; height: 110px; background: rgba(30, 200, 90, 0.45); }
+			#touch-brake { right: 140px; bottom: 26px; width: 84px; height: 84px; background: rgba(220, 50, 50, 0.45); }
+			#touch-hb { right: 30px; bottom: 150px; width: 84px; height: 84px; background: rgba(255, 42, 160, 0.5); }
+			.tsmall { width: 56px; height: 56px; font-size: 10px; top: 60px; }
+			#touch-preset { right: 16px; }
+			#touch-reset { right: 80px; }
+			#touch-cam { right: 144px; }
+			#touch-tune { right: 208px; }
+			#tune { z-index: 10; width: min(330px, calc(100vw - 24px)); touch-action: pan-y; }
+			#tune input { touch-action: auto; }
+			#tune-close { float: right; }
+			body.touch #dash { bottom: 145px; }
+			body.touch #bar { width: 130px; }
+			body.touch #speed { font-size: 36px; }
+			body.touch #angle { font-size: 28px; height: 34px; }
+			body.touch #hint { top: 42px; width: 95vw; max-width: 95vw; font-size: 10px; }
+			body.touch .tsmall { top: 85px; }
+			@media (max-height: 500px) {
+				body.touch #dash { bottom: 12px; }
+				body.touch #preset-box { bottom: 6px; font-size: 10px; }
+				#touch-gas { width: 80px; height: 80px; right: 12px; bottom: 14px; }
+				#touch-brake { width: 66px; height: 66px; right: 105px; bottom: 14px; }
+				#touch-hb { width: 66px; height: 66px; right: 18px; bottom: 106px; }
+			}
+		</style>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+					"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+				}
+			}
+		</script>
+	</head>
+	<body>
+		<div id="app"></div>
+
+		<div class="hud" id="title">SMOKE <b>CULT</b> · M1 test pad</div>
+		<div class="hud" id="hint"></div>
+		<div class="hud" id="fps"></div>
+		<div class="hud" id="flash"></div>
+		<div class="hud" id="preset-box">ASSIST <span id="preset"></span></div>
+		<div class="hud" id="dash">
+			<div id="angle"></div>
+			<div id="bar"><div id="angle-bar"></div></div>
+			<div id="speed">0</div>
+			<div id="unit">KM/H</div>
+		</div>
+
+		<div id="tune">
+			<button id="tune-close" aria-label="Close tuning">Close</button>
+			<h2>TUNING (live)</h2>
+			<div id="tune-presets"></div>
+			<div id="tune-rows"></div>
+			<div style="margin-top: 8px">
+				<button id="tune-reset">Reset to defaults</button>
+				<button id="tune-copy">Copy values</button>
+			</div>
+		</div>
+
+		<div class="touch-ui">
+			<div id="touch-steer"></div>
+			<div class="tbtn" id="touch-gas">GAS</div>
+			<div class="tbtn" id="touch-brake">BRAKE</div>
+			<div class="tbtn" id="touch-hb">HB</div>
+			<div class="tbtn tsmall" id="touch-preset">ASSIST</div>
+			<div class="tbtn tsmall" id="touch-reset">RESET</div>
+			<div class="tbtn tsmall" id="touch-cam">CAM</div>
+			<button class="tbtn tsmall" id="touch-tune">TUNE</button>
+		</div>
+
+		<script type="module" src="src/main.js"></script>
+	</body>
+</html>

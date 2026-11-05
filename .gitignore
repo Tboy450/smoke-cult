@@ -1,0 +1,9 @@
+# Local development notes and review artifacts are not part of the public repository.
+CODEX-HANDOFF.md
+DESIGN-BRIEF.md
+NOTES.md
+review/
+node_modules/
+.env
+.env.*
+*.log
