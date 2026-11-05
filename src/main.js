@@ -6,6 +6,7 @@ import { createEffects } from "./effects.js";
 import { createInput } from "./input.js";
 import { createCar, resetCar, stepCar, carAxes } from "./physics.js";
 import { CAR, PRESET_ORDER, RANGES } from "./tuning.js";
+import { createTuningPanel } from "./tuningPanel.js";
 
 const PHYSICS_DT = 1 / 240;
 const tuning = { ...CAR };
@@ -104,6 +105,7 @@ touchLayout.addEventListener("change", syncTouchLayout);
 let cameraMode = 0; // 0 chase, 1 low drift cam, 2 hood
 const CAMERA_NAMES = ["Chase", "Drift cam", "Hood"];
 const cycle = (list, current) => list[(list.indexOf(current) + 1) % list.length];
+const tuningPanel = createTuningPanel($("tune"), $("tune-close"));
 const input = createInput({
 	onPreset: () => {
 		car.preset = cycle(PRESET_ORDER, car.preset);
@@ -122,7 +124,7 @@ const input = createInput({
 		cameraMode = (cameraMode + 1) % CAMERA_NAMES.length;
 		flash(CAMERA_NAMES[cameraMode]);
 	},
-	onTune: () => $("tune").classList.toggle("open"),
+	onTune: () => tuningPanel.toggle(),
 	onMute: () => sound.toggle(),
 	onController: (standard) => flash(standard ? "Controller connected" : "Controller connected (basic mode)"),
 	// The open panel covers the touch controls. Keyboard and controller keep driving so changes can be felt live.
@@ -138,11 +140,6 @@ function flash(text) {
 
 // --- tuning panel ---
 const tuneRows = $("tune-rows");
-$("tune-close").addEventListener("click", () => $("tune").classList.remove("open"));
-// Sliders and buttons hand keyboard focus back after use, so Space and the arrow keys drive straight away.
-const releaseFocus = () => document.activeElement?.blur?.();
-document.addEventListener("change", releaseFocus);
-document.addEventListener("click", releaseFocus);
 for (const [name, [min, max, step]] of Object.entries(RANGES)) {
 	const row = document.createElement("label");
 	row.innerHTML = `<span>${name}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
