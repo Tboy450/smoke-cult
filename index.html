@@ -99,7 +99,8 @@
 			#picker.open { display: flex; }
 			#picker-title { font-size: 13px; letter-spacing: 0.12em; }
 			#picker-wheel { width: min(240px, 62vw, 46vh); height: auto; aspect-ratio: 1; touch-action: none; cursor: crosshair; }
-			#picker label { display: grid; grid-template-columns: auto 1fr 26px; gap: 8px; align-items: center; width: min(280px, 100%); font-size: 10px; letter-spacing: 0.1em; color: #d3b5dc; }
+			#picker label { display: grid; grid-template-columns: auto 1fr 3ch 26px; gap: 8px; align-items: center; width: min(280px, 100%); font-size: 10px; letter-spacing: 0.1em; color: #d3b5dc; }
+			#picker-help { margin: 0; font-size: 11px; line-height: 1.4; color: #d3b5dc; text-align: center; }
 			#picker-value { width: 100%; accent-color: var(--pink); touch-action: auto; }
 			#picker-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; }
 			#picker-done { min-height: 38px; width: min(280px, 100%); border: 0; border-radius: 6px; background: var(--pink); color: #fff; cursor: pointer; font: 900 13px "Segoe UI", system-ui, sans-serif; letter-spacing: 0.08em; }
@@ -145,9 +146,14 @@
 				background: rgba(18, 8, 26, .8); border-radius: 0 8px 8px 0; font-variant-numeric: tabular-nums; }
 			#score-box { z-index: 2; }
 			#score-box.scoring { border-color: var(--pink); }
-			#combo-toggle { position: absolute; top: 3px; right: 3px; width: 28px; height: 28px; padding: 0; pointer-events: auto; cursor: pointer; border: 0; border-radius: 5px;
+			#combo-toggle { position: absolute; top: 3px; right: 3px; width: 44px; height: 44px; padding: 0; pointer-events: auto; touch-action: manipulation; cursor: pointer; border: 0; border-radius: 5px;
 				background: rgba(255, 255, 255, 0.13); color: #fff; font: 800 17px/1 "Segoe UI", system-ui, sans-serif; }
-			#score-box.small, body.touch #score-box.small { width: 158px; padding: 5px 34px 5px 10px; }
+			.score-heading { min-height: 36px; padding-right: 34px; }
+			#score-values { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+			#score-values #combo-multiplier { float: none; padding: 0; flex-shrink: 0; }
+			#combo-score { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			#score-box.small, body.touch #score-box.small { width: 190px; min-height: 50px; padding: 10px 54px 10px 10px; }
+			#score-box.small .score-heading, #score-box.small #combo-link { display: none; }
 			#score-box.small .score-label, #score-box.small #score-feedback, #score-box.small #score-totals, #score-box.small #lap-line { display: none; }
 			#score-box.small #combo-score, body.touch #score-box.small #combo-score { font-size: 20px; }
 			#score-box.small #combo-multiplier, body.touch #score-box.small #combo-multiplier { font-size: 14px; padding-top: 5px; }
@@ -199,9 +205,9 @@
 		<div class="hud" id="flash"></div>
 		<div class="hud" id="preset-box">ASSIST <span id="preset"></span></div>
 		<section class="hud" id="score-box" aria-label="Drift scoring">
-			<div class="score-label">DRIFT COMBO</div>
-			<button id="combo-toggle" aria-label="Shrink or expand the combo box" tabindex="-1">–</button>
-			<span id="combo-score">0</span><span id="combo-multiplier">×1.00</span>
+			<div class="score-heading"><div class="score-label">DRIFT COMBO · LAP</div></div>
+			<button id="combo-toggle" type="button" aria-label="Minimize score and lap panel" aria-expanded="true">–</button>
+			<div id="score-values"><span id="combo-score">0</span><span id="combo-multiplier">×1.00</span></div>
 			<progress id="combo-link" max="1" value="0" aria-label="Time remaining to link another drift"></progress>
 			<div id="score-feedback">Build speed · 29 km/h to score</div>
 			<div id="score-totals">BANK <span id="bank-score">0</span> · BEST COMBO <span id="best-score">0</span></div>
@@ -232,7 +238,8 @@
 			<div id="picker">
 				<b id="picker-title"></b>
 				<canvas id="picker-wheel" width="240" height="240" aria-label="Color wheel"></canvas>
-				<label>BRIGHTNESS <input id="picker-value" type="range" min="0" max="100" /> <span id="picker-swatch"></span></label>
+				<label>BRIGHTNESS <input id="picker-value" aria-label="Brightness" type="range" min="0" max="100" /> <output id="picker-percent"></output><span id="picker-swatch"></span></label>
+				<p id="picker-help">Arrows / D-pad: hue &amp; saturation<br>Q/E or LB/RB: brightness</p>
 				<button id="picker-done" tabindex="-1">DONE</button>
 			</div>
 		</section>

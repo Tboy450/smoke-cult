@@ -95,3 +95,15 @@ test('color wheel math round-trips and lands on the right colors', () => {
     assert.equal(hsvToHex(h, s, v), color);
   }
 });
+
+test('phone HUD starts compact, and the saved score/lap panel choice survives reloads', () => {
+  const phone = createGarageState(null, true);
+  assert.equal(picked(phone, 'combo').id, 'small');
+  assert.equal(picked(createGarageState(null, false), 'combo').id, 'full');
+  stepOption(phone, 'combo', 1);
+  assert.equal(picked(phone, 'combo').id, 'full');
+  const reloaded = createGarageState(JSON.parse(JSON.stringify(saveData(phone))), true);
+  assert.equal(picked(reloaded, 'combo').id, 'full', 'do not override an existing choice on phones');
+  stepOption(reloaded, 'combo', 1);
+  assert.equal(picked(createGarageState(saveData(reloaded), true), 'combo').id, 'small');
+});

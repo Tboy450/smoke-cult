@@ -120,6 +120,11 @@ test('controls release on focus/capture loss, survive reconnects and work around
     emit(win, 'keydown', { code: 'KeyE', preventDefault() {} });
     assert.deepEqual(menu, ['0,-1', '1,0', 'confirm', 'back', 'tab']);
     menu.length = 0;
+    const rangeArrow = Object.assign(new Event('keydown', { cancelable: true }), { code: 'ArrowRight' });
+    Object.defineProperty(rangeArrow, 'target', { value: { matches: () => true } });
+    win.dispatchEvent(rangeArrow);
+    assert.equal(rangeArrow.defaultPrevented, false, 'garage brightness slider keeps native arrow adjustments');
+    assert.equal(menu.length, 0, 'slider adjustment must not move the color wheel or garage selection');
     input.update();
     assert.deepEqual(input.controls, { throttle: 0, brake: 0, steer: 0, handbrake: false }, 'keys in the garage never drive');
 

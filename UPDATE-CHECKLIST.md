@@ -1,6 +1,7 @@
 # SMOKE CULT — update checklist
 
-Updated November 6, 2026. Latest game feature commit: `ff2879e` (recovered Claude garage update).
+Updated November 6, 2026. Current update: compact mobile score/lap panel and color-picker control fixes.
+Prior recovered garage update: `ff2879e`.
 
 This is the shared checklist for continuing SMOKE CULT. Update it whenever a feature is completed,
 tested, published or deferred. A completed implementation is not proof that it feels good on a real device.
@@ -24,6 +25,10 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Banked-point upgrade shop: engine, tires, steering angle and weight; per-car stages.
 - [x] Browser saving for garage selections, custom colors, upgrade bank and purchased parts.
 - [x] Compact combo HUD and low-graphics option.
+- [x] Larger touch minimize/expand button for the whole score/lap panel; short collapsed strip and saved preference.
+- [x] New mobile sessions default to a compact score/lap panel without overriding existing saved choices.
+- [x] Color-wheel brightness through Q/E or controller LB/RB, native keyboard slider input and percentage display.
+- [x] Color wheel tracks one finger and stops on release, lost pointer capture, cancellation or picker closure.
 - [x] Live tuning with keyboard/controller driving while adjusting settings.
 - [x] Assist-dependent gravel behavior, including grip, drag and braking.
 - [x] Recovered Claude's uncommitted update, backed it up, committed all required modules and published it.
@@ -31,6 +36,8 @@ tested, published or deferred. A completed implementation is not proof that it f
 ## Verification completed
 
 - [x] All 65 Node tests passed for the recovered update, including the HTTP test with localhost access enabled.
+- [x] New automated regressions cover pointer ownership, drag cancellation, brightness controls, custom-color saving and compact-HUD defaults/persistence.
+- [x] All 69 Node tests and scripted physics checks passed after the HUD and picker fixes.
 - [x] Headless physics checks passed for Arcade, Balanced and Off.
 - [x] All source JavaScript files passed syntax checks.
 - [x] AI lap, upgraded-car handling, gravel, color math, save-state and purchase checks passed.
@@ -38,7 +45,8 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Earlier scoring HUD was visually checked at desktop, 390×844 and 844×390.
 - [x] GitHub Pages build and public availability of recovered color-wheel markup, decals and upgrade code verified.
 
-The browser checker timed out during recovery. The earlier visual checks do **not** cover the recovered garage changes.
+The browser checker timed out during recovery and again during this follow-up. The earlier visual checks do **not**
+cover the recovered garage or current HUD/control changes. New interaction checks use drawing stubs, not visual rendering.
 
 ## Next: verify the recovered update
 

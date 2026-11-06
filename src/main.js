@@ -309,6 +309,10 @@ function applyComboBox() {
 	const small = picked(garage, "combo").id === "small";
 	$("score-box").classList.toggle("small", small);
 	$("combo-toggle").textContent = small ? "+" : "–";
+	const label = small ? "Expand score and lap panel" : "Minimize score and lap panel";
+	$("combo-toggle").setAttribute("aria-label", label);
+	$("combo-toggle").setAttribute("aria-expanded", String(!small));
+	$("combo-toggle").title = label;
 }
 function toggleComboBox() {
 	stepOption(garage, "combo", 1);

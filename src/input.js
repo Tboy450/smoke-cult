@@ -39,6 +39,8 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 			return;
 		}
 		if (isMenuOpen()) {
+			// The brightness slider keeps native keyboard adjustments while the garage is open.
+			if (e.target?.matches?.('input[type="range"]') && e.code.startsWith("Arrow")) return;
 			const step = MENU_KEYS[e.code];
 			if (step) onMenu(step[0], step[1]);
 			else if (!e.repeat && (e.code === "KeyQ" || e.code === "KeyE")) onMenu(e.code === "KeyQ" ? -1 : 1, 0, "tab");

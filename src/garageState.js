@@ -111,6 +111,7 @@ export function createGarageState(saved = null, lowGraphics = false) {
 	}
 	for (const key of WHEEL_COLORS) if (validColor(saved?.custom?.[key])) state.custom[key] = saved.custom[key];
 	if (saved?.graphics === undefined && lowGraphics) state.graphics = 1;
+	if (saved?.combo === undefined && lowGraphics) state.combo = 1;
 	return state;
 }
 

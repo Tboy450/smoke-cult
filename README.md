@@ -30,6 +30,12 @@ The Upgrades tab spends banked drift points on per-car engine, tires, angle-kit 
 In the garage, use the D-pad or stick to choose and LB/RB to switch tabs. A buys, opens a color picker or drives,
 depending on the selected row. Keyboard: arrows, Q/E for tabs and Enter to select. Touch: tap the controls.
 
+With a color wheel open, arrows/D-pad adjust hue and saturation; Q/E or LB/RB adjust brightness.
+The brightness slider also accepts normal keyboard arrow adjustments.
+
+**Less HUD on phones:** tap **−** on the score/lap panel to collapse it into a short score strip; tap **+** to restore
+the full panel. H does the same on keyboard. The choice is remembered; new mobile sessions start compact.
+
 **Sound** is on by default and starts on your first tap or key press, as browsers require. On iPhones, the ring/silent
 switch can also mute it.
 
