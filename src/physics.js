@@ -191,7 +191,8 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 		const stopLong = (0.5 * Math.abs(vLong) * cornerMass) / dt;
 
 		// Engine (rear-wheel drive), brakes, handbrake, rolling resistance.
-		let fLong = -vLong * cornerMass * 0.02;
+		const rough = (1 - (hit.grip ?? 1)) * preset.SurfacePenalty; // 0 on the road
+		let fLong = -vLong * cornerMass * (0.02 + rough * 0.6);
 		if (coasting && !def.front) fLong -= sign(vLong) * Math.min(cornerMass * 1.2, stopLong); // engine braking
 		if (!def.front) {
 			if (reversing) {
@@ -204,12 +205,13 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 			if (controls.handbrake) fLong -= sign(vLong) * Math.min(cornerMass * c.BrakeAccel * 0.8, stopLong);
 		}
 		if (controls.brake > 0 && !reversing) {
-			fLong -= sign(vLong) * Math.min(controls.brake * cornerMass * c.BrakeAccel, stopLong);
+			// Brakes bite less on loose ground, even when there's grip to spare for cornering.
+			fLong -= sign(vLong) * Math.min(controls.brake * cornerMass * c.BrakeAccel * (1 - rough * 2), stopLong);
 		}
 		if (coasting && Math.abs(vLong) < 0.5) fLong -= sign(vLong) * stopLong; // parked cars stay parked
 
 		// Friction circle: grip spent on power/braking is gone from cornering (but never all of it).
-		let grip = (def.front ? c.FrontGrip : c.RearGrip) * (hit.grip ?? 1);
+		let grip = (def.front ? c.FrontGrip : c.RearGrip) * (1 - rough);
 		if (controls.handbrake && !def.front) grip *= c.HandbrakeGrip;
 		const maxForce = grip * load;
 		fLong = clamp(fLong, -maxForce, maxForce);

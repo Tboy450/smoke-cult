@@ -7,7 +7,7 @@ import { mergeGeometries, mergeVertices, toCreasedNormals } from "three/addons/u
 
 const DARK = new THREE.MeshStandardMaterial({ color: 0x0d0d11, roughness: 0.8 });
 const TRIM = new THREE.MeshStandardMaterial({ color: 0x17171c, metalness: 0.4, roughness: 0.45 });
-const GLASS = new THREE.MeshStandardMaterial({ color: 0x090c14, metalness: 0.7, roughness: 0.08, transparent: true, opacity: 0.62 });
+const GLASS = new THREE.MeshStandardMaterial({ color: 0x18222e, metalness: 0.75, roughness: 0.08, transparent: true, opacity: 0.86 });
 const HEAD = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff2d6, emissiveIntensity: 3 });
 const TAIL = new THREE.MeshStandardMaterial({ color: 0xff1030, emissive: 0xff1030, emissiveIntensity: 3 });
 const TIRE = new THREE.MeshStandardMaterial({ color: 0x101012, roughness: 0.92 });
@@ -95,19 +95,38 @@ function roofGeometry(def) {
 }
 
 // One wheel's shapes, merged by material. Three draw calls per wheel instead of seventeen, which phones feel.
-function wheelGeometry(radius) {
+function wheelGeometry(radius, style) {
 	const width = 0.27;
 	const dishes = [];
 	const metal = [];
-	for (const side of [-1, 1]) {
-		dishes.push(new THREE.CylinderGeometry(radius * 0.66, radius * 0.66, 0.012, 24).rotateZ(Math.PI / 2).translate(side * (width / 2 + 0.002), 0, 0));
-		metal.push(new THREE.CylinderGeometry(radius * 0.17, radius * 0.17, 0.03, 12).rotateZ(Math.PI / 2).translate(side * (width / 2 + 0.012), 0, 0));
-		metal.push(new THREE.TorusGeometry(radius * 0.68, radius * 0.055, 8, 28).rotateY(Math.PI / 2).translate(side * (width / 2 + 0.004), 0, 0));
-		for (let i = 0; i < 5; i++) {
-			const angle = (i / 5) * Math.PI * 2;
-			const spoke = new THREE.BoxGeometry(0.022, radius * 0.6, radius * 0.13).rotateX(-angle);
-			metal.push(spoke.translate(side * (width / 2 + 0.01), Math.cos(angle) * radius * 0.36, Math.sin(angle) * radius * 0.36));
+	const spokes = (x, count, length, thick, turn = 0, at = 0.36) => {
+		for (let i = 0; i < count; i++) {
+			const angle = (i / count) * Math.PI * 2;
+			const g = new THREE.BoxGeometry(0.022, length, thick).rotateY(turn).rotateX(-angle);
+			metal.push(g.translate(x, Math.cos(angle) * radius * at, Math.sin(angle) * radius * at));
 		}
+	};
+	const ring = (x, at, tube) => metal.push(new THREE.TorusGeometry(radius * at, radius * tube, 8, 28).rotateY(Math.PI / 2).translate(x, 0, 0));
+	for (const side of [-1, 1]) {
+		const face = side * (width / 2);
+		dishes.push(new THREE.CylinderGeometry(radius * 0.66, radius * 0.66, 0.012, 24).rotateZ(Math.PI / 2).translate(face + side * 0.002, 0, 0));
+		metal.push(new THREE.CylinderGeometry(radius * 0.17, radius * 0.17, 0.03, 12).rotateZ(Math.PI / 2).translate(face + side * 0.012, 0, 0));
+		if (style === "dish") {
+			ring(face + side * 0.006, 0.76, 0.085);
+			spokes(face - side * 0.03, 5, radius * 0.4, radius * 0.11, 0, 0.24);
+		} else {
+			ring(face + side * 0.004, 0.68, 0.055);
+		}
+		if (style === "five") spokes(face + side * 0.01, 5, radius * 0.6, radius * 0.13);
+		if (style === "mesh") {
+			spokes(face + side * 0.01, 10, radius * 0.62, radius * 0.045);
+			ring(face + side * 0.01, 0.42, 0.024);
+		}
+		if (style === "steel") {
+			metal.push(new THREE.CylinderGeometry(radius * 0.63, radius * 0.63, 0.02, 24).rotateZ(Math.PI / 2).translate(face + side * 0.006, 0, 0));
+			ring(face + side * 0.018, 0.34, 0.03);
+		}
+		if (style === "turbine") spokes(face + side * 0.01, 12, radius * 0.56, radius * 0.1, 0.7);
 	}
 	return {
 		tire: new THREE.CylinderGeometry(radius, radius, width, 28).rotateZ(Math.PI / 2),
@@ -152,7 +171,98 @@ function glowTexture() {
 	return new THREE.CanvasTexture(c);
 }
 
-function addDetails(group, def, paint) {
+// Decals live on a copy of the body, wrapped on like a sticker sheet. The lower half of the sheet is the car's side and the
+// upper half is the top, so shapes need to read well mirrored on both sides.
+function addDecalUv(g, def) {
+	const position = g.getAttribute("position");
+	const normal = g.getAttribute("normal");
+	const zMin = def.upper[0][0];
+	const zLength = def.upper[def.upper.length - 1][0] - zMin;
+	const clamp = (n) => Math.min(1, Math.max(0, n));
+	const uv = new Float32Array(position.count * 2);
+	for (let t = 0; t < position.count; t += 3) {
+		const nx = Math.abs(normal.getX(t) + normal.getX(t + 1) + normal.getX(t + 2));
+		const ny = Math.abs(normal.getY(t) + normal.getY(t + 1) + normal.getY(t + 2));
+		const nz = Math.abs(normal.getZ(t) + normal.getZ(t + 1) + normal.getZ(t + 2));
+		for (let i = t; i < t + 3; i++) {
+			if (nz > nx && nz > ny) continue; // nose and tail stay clean: a blank corner of the sheet
+			uv[i * 2] = clamp((position.getZ(i) - zMin) / zLength);
+			uv[i * 2 + 1] = nx > ny
+				? 0.5 * clamp((position.getY(i) - def.floor) / (0.4 - def.floor))
+				: 0.5 + 0.5 * clamp((position.getX(i) + def.width) / (def.width * 2));
+		}
+	}
+	g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+}
+
+function drawDecal(g, style, W) {
+	const X = (u) => u * W;
+	const side = (y) => W - (y * W) / 2;
+	const top = (x) => W / 2 - (x * W) / 2;
+	g.fillStyle = g.strokeStyle = "#fff";
+	const flames = (at) => {
+		g.beginPath();
+		g.moveTo(X(0.03), at(0.16));
+		[0.42, 0.3, 0.5, 0.34].forEach((tip, i) => {
+			const a = 0.16 + i * 0.17;
+			g.quadraticCurveTo(X(tip * 0.6), at(a), X(tip), at(a + 0.085));
+			g.quadraticCurveTo(X(tip * 0.6), at(a + 0.17), X(0.12), at(a + 0.17));
+		});
+		g.lineTo(X(0.03), at(0.84));
+		g.closePath();
+		g.fill();
+	};
+	if (style === "stripes") {
+		g.fillRect(X(0.015), top(0.65), W, top(0.54) - top(0.65));
+		g.fillRect(X(0.015), top(0.46), W, top(0.35) - top(0.46));
+	} else if (style === "slash") {
+		for (const [u, wide] of [[0.34, 0.11], [0.48, 0.04]]) {
+			g.beginPath();
+			g.moveTo(X(u), side(0.12));
+			g.lineTo(X(u + wide), side(0.12));
+			g.lineTo(X(u + wide + 0.16), side(0.82));
+			g.lineTo(X(u + 0.16), side(0.82));
+			g.closePath();
+			g.fill();
+		}
+	} else if (style === "flames") {
+		flames(side);
+		flames(top);
+	} else if (style === "checker") {
+		const cell = 0.032;
+		for (let col = 0; col < 16; col++) {
+			for (let row = 0; row < 7; row++) {
+				if ((col + row) % 2 || (col * 7 + row * 3) % 16 > col) continue;
+				g.fillRect(X(0.46 + col * cell), side(0.14 + (row + 1) * 0.1), X(cell), side(0) - side(0.1));
+			}
+		}
+	} else if (style === "ring") {
+		g.lineWidth = 15;
+		for (const [x, y, ry] of [[X(0.2), top(0.5), 70], [X(0.5), side(0.48), 130]]) {
+			g.beginPath();
+			g.ellipse(x, y, 58, ry, 0, 0, Math.PI * 2);
+			g.moveTo(x, y + ry * 0.62);
+			g.bezierCurveTo(x + 50, y + ry * 0.25, x - 50, y - ry * 0.25, x, y - ry * 0.62);
+			g.stroke();
+		}
+	}
+}
+
+const decalTextures = new Map();
+function decalTexture(style) {
+	if (!decalTextures.has(style)) {
+		const c = document.createElement("canvas");
+		c.width = c.height = 1024;
+		drawDecal(c.getContext("2d"), style, 1024);
+		const t = new THREE.CanvasTexture(c);
+		t.colorSpace = THREE.SRGBColorSpace;
+		t.anisotropy = 4;
+		decalTextures.set(style, t);
+	}
+	return decalTextures.get(style);
+}
+
+function addDetails(group, def, paint, kit, archRadius, wheelY) {
 	const w = def.width;
 	const [noseZ, noseY] = def.upper[0];
 	const tailZ = def.upper[def.upper.length - 1][0];
@@ -174,16 +284,41 @@ function addDetails(group, def, paint) {
 	}
 	const deckY = def.upper[def.upper.length - 2][1];
 	const deckZ = def.upper[def.upper.length - 2][0];
-	if (def.wing === "gt") {
+	const wing = kit === "track" ? "gt" : def.wing;
+	if (wing === "gt") {
 		group.add(box(w * 1.95, 0.035, 0.34, TRIM, 0, deckY + 0.3, deckZ - 0.02));
 		for (const side of [-1, 1]) {
 			group.add(box(0.035, 0.32, 0.16, TRIM, side * w * 0.6, deckY + 0.14, deckZ));
 			group.add(box(0.025, 0.13, 0.36, paint, side * w * 0.97, deckY + 0.3, deckZ - 0.02));
 		}
-	} else if (def.wing === "duck") {
+	} else if (wing === "duck") {
 		const lip = box(w * 1.6, 0.05, 0.3, paint, 0, deckY + 0.05, deckZ);
 		lip.rotation.x = 0.28;
 		group.add(lip);
+	}
+	if (kit === "street" || kit === "track") {
+		group.add(box(w * 2.1, 0.04, 0.52, paint, 0, def.floor - 0.035, noseZ + 0.2)); // deeper front lip
+		for (const side of [-1, 1]) group.add(box(0.07, 0.11, def.wheelbase - 1.05, paint, side * (w + 0.01), def.floor + 0.04, 0));
+	}
+	if (kit === "track") {
+		for (const side of [-1, 1]) {
+			const canard = box(0.24, 0.02, 0.17, TRIM, side * w * 0.9, noseY + 0.1, noseZ + 0.34);
+			canard.rotation.z = side * 0.28;
+			group.add(canard);
+		}
+		const top = Math.max(...def.glass.map((p) => p[1]));
+		group.add(box(0.02, 0.09, 0.9, paint, 0, top + 0.05, 0.75)); // roof fin
+	}
+	if (kit === "wide") {
+		for (const z of [-def.wheelbase / 2, def.wheelbase / 2]) {
+			for (const side of [-1, 1]) {
+				const flare = new THREE.Mesh(new THREE.TorusGeometry(archRadius + 0.02, 0.06, 8, 20, Math.PI).rotateY(Math.PI / 2), paint);
+				flare.position.set(side * (w - 0.01), wheelY, z);
+				flare.scale.x = 1.7;
+				flare.castShadow = true;
+				group.add(flare);
+			}
+		}
 	}
 	if (def.scoop) group.add(box(0.5, 0.09, 0.8, DARK, 0, 0.24, -1.15));
 	if (def.rack) {
@@ -202,6 +337,9 @@ export function createCarModel(scene, tuning) {
 		map: glowTexture(), color: 0xff2aa0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8,
 	});
 	const glow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), glowMaterial);
+	const decalMaterial = new THREE.MeshStandardMaterial({
+		transparent: true, depthWrite: false, metalness: 0.3, roughness: 0.42, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+	});
 	const wheelViews = {};
 	let shell = null;
 	let token = 0;
@@ -240,7 +378,7 @@ export function createCarModel(scene, tuning) {
 
 	return {
 		root,
-		setCar(def) {
+		setCar(def, { kit = "stock", wheels = "five", decal = "none" } = {}) {
 			token++;
 			clear();
 			const wheelY = def.wheels[0].mount[1] - tuning.SpringLength * (1 - tuning.StaticSag);
@@ -252,18 +390,25 @@ export function createCarModel(scene, tuning) {
 			const roof = new THREE.Mesh(roofGeometry(def), paint);
 			roof.castShadow = true;
 			shell.add(body, cabin, roof);
+			if (decal !== "none") {
+				addDecalUv(body.geometry, def);
+				addDecalUv(roof.geometry, def);
+				decalMaterial.map = decalTexture(decal);
+				decalMaterial.needsUpdate = true;
+				shell.add(new THREE.Mesh(body.geometry, decalMaterial), new THREE.Mesh(roof.geometry, decalMaterial));
+			}
 			// Dark wheel wells, so you see shadow rather than paint behind the wheels.
 			for (const z of [-def.wheelbase / 2, def.wheelbase / 2]) {
 				const well = new THREE.Mesh(new THREE.CylinderGeometry(archRadius - 0.012, archRadius - 0.012, def.width * 2 - 0.05, 24, 1, false, 0, Math.PI).rotateZ(Math.PI / 2), DARK);
 				well.position.set(0, wheelY, z);
 				shell.add(well);
 			}
-			addDetails(shell, def, paint);
+			addDetails(shell, def, paint, kit, archRadius, wheelY);
 			root.add(shell, makeDriver(def));
 			glow.scale.set(def.width * 3.4, 1, def.length * 1.35);
 			glow.position.y = -(tuning.WheelRadius + tuning.SpringLength * (1 - tuning.StaticSag) + 0.2) + 0.03;
 			root.add(glow);
-			const wheelParts = wheelGeometry(tuning.WheelRadius);
+			const wheelParts = wheelGeometry(tuning.WheelRadius, wheels);
 			for (const wheelDef of def.wheels) {
 				const pivot = new THREE.Group(); // moves with suspension + steering
 				const spinner = makeWheel(wheelParts, rimMaterial); // spins
@@ -273,9 +418,10 @@ export function createCarModel(scene, tuning) {
 			}
 			if (def.glb) useGlb(def, token);
 		},
-		setLook({ paint: paintColor, rims, glow: glowColor }) {
+		setLook({ paint: paintColor, rims, glow: glowColor, decal }) {
 			paint.color.setHex(paintColor);
 			rimMaterial.color.setHex(rims);
+			decalMaterial.color.setHex(decal);
 			glow.visible = glowColor !== null;
 			if (glowColor !== null) glowMaterial.color.setHex(glowColor);
 		},

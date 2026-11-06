@@ -2,35 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CAR } from '../src/tuning.js';
 import { carAxes, createCar, placeCar, stepCar } from '../src/physics.js';
-import { buildTrack, collideCar, createLap, createTrackWorld, nearestSample, PAD, resetLap, ROAD_WIDTH, stepLap, zoneAt } from '../src/track.js';
+import { buildTrack, collideCar, createLap, createTrackWorld, GARAGE, inGarageBay, nearestSample, PAD, resetLap, ROAD_WIDTH, stepLap, zoneAt } from '../src/track.js';
+import { drive } from './support/aiDriver.mjs';
 
 const track = buildTrack();
 const world = createTrackWorld(track);
 const dt = 1 / 240;
-
-// A simple robot driver: follow the centre line, slowing for what's ahead.
-export function drive(car, tuning, lapState, seconds, onStep = () => {}) {
-  let worstImpact = 0;
-  for (let i = 0; i < seconds / dt; i++) {
-    const { index } = nearestSample(track, car.pos[0], car.pos[2], lapState.index);
-    const speed = Math.hypot(car.vel[0], car.vel[2]);
-    const aim = track.samples[(index + 4 + Math.round(speed / 5)) % track.count];
-    let tight = 0;
-    for (let j = 0; j < 30; j++) tight = Math.max(tight, Math.abs(track.samples[(index + j) % track.count].curve));
-    const target = Math.min(32, Math.sqrt(7 / Math.max(tight, 0.004)));
-    const { look, right } = carAxes(car);
-    const dx = aim.x - car.pos[0];
-    const dz = aim.z - car.pos[2];
-    const error = Math.atan2(dx * right[0] + dz * right[2], dx * look[0] + dz * look[2]);
-    const controls = { steer: Math.max(-1, Math.min(1, error * 2.2)), throttle: speed < target ? 0.75 : 0, brake: speed > target + 2 ? 0.6 : 0, handbrake: false };
-    stepCar(car, controls, tuning, dt, world);
-    const hit = collideCar(car, world, tuning.Mass);
-    if (hit) worstImpact = Math.max(worstImpact, hit.impact);
-    const event = i % 8 === 0 ? stepLap(lapState, track, car.pos[0], car.pos[2], speed, dt * 8, 0) : null;
-    if (onStep(event, i * dt) === true) break;
-  }
-  return worstImpact;
-}
 
 test('the circuit is a sensible, closed, non-overlapping loop', () => {
   assert.ok(track.length > 1400 && track.length < 2400, `length ${track.length}`);
@@ -130,7 +107,7 @@ test('a robot driver can lap it, and the lap counter agrees', () => {
   placeCar(car, track.spawn.x - track.samples[0].tx * 20, track.spawn.z - track.samples[0].tz * 20, track.spawn.yaw);
   lap.index = nearestSample(track, car.pos[0], car.pos[2]).index;
   const events = [];
-  const impact = drive(car, CAR, lap, 300, (event) => {
+  const impact = drive(car, CAR, track, world, lap, 300, {}, (event) => {
     if (event) events.push(event);
     return lap.lap >= 2;
   });
@@ -162,6 +139,57 @@ test('lap points include a combo still running, and never go negative', () => {
   assert.equal(lap.lap, 2);
   assert.equal(lap.lastScore, 0);
   assert.equal(lap.bestScore, 500);
+});
+
+test('you can drive into the Smokehouse through the door, and out again, but not through the walls', () => {
+  const idle = { throttle: 0, brake: 0, steer: 0, handbrake: false };
+  const roll = (car, controls, secs) => {
+    for (let i = 0; i < secs / dt; i++) {
+      stepCar(car, controls, CAR, dt, world);
+      collideCar(car, world, CAR.Mass);
+    }
+  };
+  // In off the paddock, heading -X toward the bay.
+  const car = createCar(CAR, [0, 1, 0]);
+  placeCar(car, GARAGE.x + 34, GARAGE.z, Math.PI / 2);
+  roll(car, idle, 0.4);
+  car.vel = [-14, 0, 0];
+  let reached = false;
+  for (let i = 0; i < 240 * 4 && !reached; i++) {
+    stepCar(car, idle, CAR, dt, world);
+    collideCar(car, world, CAR.Mass);
+    reached = inGarageBay(car.pos[0], car.pos[2]);
+  }
+  assert.ok(reached, `never reached the bay, stopped at x=${car.pos[0]}`);
+
+  // Back out through the door under power.
+  placeCar(car, GARAGE.x, GARAGE.z, -Math.PI / 2);
+  roll(car, { ...idle, throttle: 1 }, 3);
+  assert.ok(car.pos[0] > GARAGE.x + GARAGE.halfX + 5, `stuck inside at x=${car.pos[0]}`);
+  assert.ok(!inGarageBay(car.pos[0], car.pos[2]));
+
+  // The hangout corner and the tool chests are solid too, and neither sits in the stopping bay.
+  const solid = track.blocks.filter((b) => b.kind === 'garage');
+  assert.equal(solid.length, 5);
+  for (const b of solid) {
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      assert.ok(!inGarageBay(b.x + sx * b.hx, b.z + sz * b.hz), 'furniture blocks the bay');
+    }
+  }
+
+  // The other three sides are solid.
+  for (const [x, z, yaw, vel] of [
+    [GARAGE.x, GARAGE.z - GARAGE.halfZ - 14, Math.PI, [0, 0, 30]],
+    [GARAGE.x, GARAGE.z + GARAGE.halfZ + 14, 0, [0, 0, -30]],
+    [GARAGE.x - GARAGE.halfX - 14, GARAGE.z, -Math.PI / 2, [30, 0, 0]],
+  ]) {
+    const hit = createCar(CAR, [0, 1, 0]);
+    placeCar(hit, x, z, yaw);
+    roll(hit, idle, 0.4);
+    hit.vel = [...vel];
+    roll(hit, idle, 1.2);
+    assert.ok(!inGarageBay(hit.pos[0], hit.pos[2]), 'drove through a wall');
+  }
 });
 
 test('short cuts and wrong-way driving do not count as laps', () => {

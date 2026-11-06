@@ -5,20 +5,23 @@ import { carById } from "./cars.js";
 import { createCarModel } from "./carModel.js";
 import { createEffects } from "./effects.js";
 import { createGarageUi } from "./garageUi.js";
-import { createGarageState, picked, saveData, stepOption } from "./garageState.js";
+import { colorOf, createGarageState, picked, saveData, stepOption } from "./garageState.js";
 import { createInput, TOUCH_LAYOUT_QUERY } from "./input.js";
 import { createCar, fitCar, placeCar, resetCar, stepCar, carAxes } from "./physics.js";
 import { awardBonus, createScore, stepScore, finishScore, SCORE_RULES } from "./scoring.js";
 import { createSound } from "./sound.js";
-import { buildTrack, collideCar, createLap, createTrackWorld, GARAGE, nearestSample, resetLap, stepLap, zoneAt } from "./track.js";
+import { buildTrack, collideCar, createLap, createTrackWorld, GARAGE, inGarageBay, nearestSample, resetLap, stepLap, zoneAt } from "./track.js";
 import { CAR, PRESET_ORDER, RANGES } from "./tuning.js";
 import { createTuningPanel } from "./tuningPanel.js";
+import { buy, carTuning, createProgress, earn, levelsFor } from "./upgrades.js";
 import { buildYard } from "./yard.js";
 
 const PHYSICS_DT = 1 / 240;
 const WALL_HIT = 3.5; // m/s into a wall that ends a combo; anything softer is a scrape
 const CLIP_ANGLE = 20;
 const SAVE_KEY = "smoke-cult-garage";
+const PROGRESS_KEY = "smoke-cult-progress";
+const BAY_SPEED = 7; // m/s: slow to this in the Smokehouse bay and the garage opens
 const tuning = { ...CAR };
 
 // --- renderer, scene, light ---
@@ -80,7 +83,7 @@ const effects = createEffects(scene);
 // --- HUD ---
 const $ = (id) => document.getElementById(id);
 const HINTS = {
-	keyboard: "W gas · S brake/reverse · A/D steer · SPACE handbrake · T assist · R reset · C camera · G garage · TAB tuning · M sound",
+	keyboard: "W gas · S brake/reverse · A/D steer · SPACE handbrake · T assist · R reset · C camera · G garage · H combo box · TAB tuning · M sound",
 	gamepad: "RT gas · LT brake/reverse · Left stick steer · A/X handbrake · D-pad ↑ assist · D-pad ↓ reset · Y camera · Menu garage · View tuning",
 	touch: "Drag left side to steer · GAS / BRAKE / HB on the right",
 };
@@ -89,21 +92,24 @@ const syncTouchLayout = () => document.body.classList.toggle("touch", touchLayou
 syncTouchLayout();
 touchLayout.addEventListener("change", syncTouchLayout);
 
-function loadGarage() {
+function loadSaved(key) {
 	try {
-		return JSON.parse(localStorage.getItem(SAVE_KEY));
+		return JSON.parse(localStorage.getItem(key));
 	} catch {
 		return null;
 	}
 }
-function saveGarage() {
+function save(key, data) {
 	try {
-		localStorage.setItem(SAVE_KEY, JSON.stringify(saveData(garage)));
+		localStorage.setItem(key, JSON.stringify(data));
 	} catch {
 		// Private windows can refuse storage. The game works the same, it just won't remember.
 	}
 }
-const garage = createGarageState(loadGarage(), touchLayout.matches);
+const saveGarage = () => save(SAVE_KEY, saveData(garage));
+const saveProgress = () => save(PROGRESS_KEY, progress);
+const garage = createGarageState(loadSaved(SAVE_KEY), touchLayout.matches);
+const progress = createProgress(loadSaved(PROGRESS_KEY));
 // Sound itself starts on the first real tap or key press. Starting it any earlier is what phones refuse.
 const sound = createSound({ enabled: picked(garage, "sound").id === "on" });
 
@@ -124,9 +130,19 @@ function fitView() {
 }
 addEventListener("resize", fitView);
 
+// Banked points go into the bank to spend on upgrades. Lost combos pay nothing.
+let paidTotal = 0;
+function payBanked() {
+	if (score.total <= paidTotal) return;
+	earn(progress, score.total - paidTotal);
+	paidTotal = score.total;
+	saveProgress();
+}
+
 function openGarage() {
 	if (mode === "garage") return;
 	finishScore(score, "Back to garage", true);
+	payBanked();
 	mode = "garage";
 	document.body.classList.add("garage");
 	yard.garage.setLit(true);
@@ -134,13 +150,21 @@ function openGarage() {
 	fitView();
 }
 
+const SMOKEHOUSE_SPOT = { x: GARAGE.x, z: GARAGE.z, yaw: -Math.PI / 2 }; // nose toward the open door
+let bayArmed = true;
+function checkBay() {
+	if (!inGarageBay(car.pos[0], car.pos[2])) bayArmed = true;
+	else if (bayArmed && car.speed < BAY_SPEED) openGarage();
+}
+
 function leaveGarage() {
 	mode = "drive";
 	document.body.classList.remove("garage");
 	yard.garage.setLit(false);
 	saveGarage();
-	const spot = picked(garage, "place").id === "pad" ? track.padSpawn : track.spawn;
+	const spot = { smokehouse: SMOKEHOUSE_SPOT, track: track.spawn, pad: track.padSpawn }[picked(garage, "place").id];
 	placeCar(car, spot.x, spot.z, spot.yaw);
+	bayArmed = false; // leaving the bay shouldn't reopen the garage
 	resetLap(lap, track, car.pos[0], car.pos[2]);
 	resetCones();
 	effects.clearSkids();
@@ -183,11 +207,14 @@ const input = createInput({
 		flash(standard ? "Controller connected" : "Controller connected (basic mode)");
 	},
 	onGarage: openGarage,
+	onCombo: toggleComboBox,
 	isMenuOpen: () => mode === "garage",
 	onMenu: (dx, dy, action) => {
 		sound.unlock();
-		if (action) leaveGarage();
-		else garageUi.move(dx, dy);
+		if (action === "tab") garageUi.tab(dx);
+		else if (action === "confirm" && garageUi.confirm()) leaveGarage();
+		else if (action === "back" && garageUi.back()) leaveGarage();
+		else if (!action) garageUi.move(dx, dy);
 	},
 	// The open panel covers the touch controls. Keyboard and controller keep driving so changes can be felt live.
 	isTouchBlocked: () => $("tune").classList.contains("open"),
@@ -242,7 +269,7 @@ for (const name of PRESET_ORDER) {
 }
 syncPresetButtons();
 $("tune-reset").addEventListener("click", () => {
-	Object.assign(tuning, CAR, carById(picked(garage, "car").id).tuning);
+	Object.assign(tuning, baseTuning());
 	syncTuningSliders();
 });
 $("tune-copy").addEventListener("click", async () => {
@@ -257,17 +284,37 @@ $("tune-copy").addEventListener("click", async () => {
 });
 
 // --- garage ---
+const currentCar = () => carById(picked(garage, "car").id);
+// The car's numbers, including everything bought for it.
+function baseTuning() {
+	const def = currentCar();
+	return carTuning(CAR, def.tuning, levelsFor(progress, def.id));
+}
 function applyLook() {
-	model.setLook({ paint: picked(garage, "paint").color, rims: picked(garage, "rims").color, glow: picked(garage, "glow").color });
+	model.setLook({ paint: colorOf(garage, "paint"), rims: colorOf(garage, "rims"), decal: colorOf(garage, "decalColor"), glow: picked(garage, "glow").color });
 	effects.setSmokeColor(picked(garage, "smoke").color);
 }
+function buildCarModel() {
+	model.setCar(currentCar(), { kit: picked(garage, "kit").id, wheels: picked(garage, "wheels").id, decal: picked(garage, "decal").id });
+	applyLook();
+}
 function applyCar() {
-	const def = carById(picked(garage, "car").id);
-	Object.assign(tuning, CAR, def.tuning);
+	const def = currentCar();
+	Object.assign(tuning, baseTuning());
 	syncTuningSliders();
 	fitCar(car, tuning, def.wheels, def.body);
-	model.setCar(def);
-	applyLook();
+	buildCarModel();
+}
+function applyComboBox() {
+	const small = picked(garage, "combo").id === "small";
+	$("score-box").classList.toggle("small", small);
+	$("combo-toggle").textContent = small ? "+" : "–";
+}
+function toggleComboBox() {
+	stepOption(garage, "combo", 1);
+	applyComboBox();
+	saveGarage();
+	garageUi.render();
 }
 function showSoundButton() {
 	const on = picked(garage, "sound").id === "on";
@@ -291,21 +338,33 @@ function applyGraphics() {
 	renderer.setSize(innerWidth, innerHeight);
 	sun.castShadow = !low;
 }
-const garageUi = createGarageUi($("garage"), garage, {
+const garageUi = createGarageUi($("garage"), garage, progress, {
 	onChange: (key) => {
 		if (key === "car") applyCar();
+		else if (key === "kit" || key === "wheels" || key === "decal") buildCarModel();
 		else if (key === "graphics") applyGraphics();
 		else if (key === "sound") applySound();
+		else if (key === "combo") applyComboBox();
 		else if (key !== "place") applyLook();
 		saveGarage();
 	},
 	onDrive: leaveGarage,
+	onBuy: (partId) => {
+		const result = buy(progress, currentCar().id, partId);
+		if (result.ok) {
+			saveProgress();
+			applyCar();
+		}
+		return result;
+	},
 });
 applyCar();
 applyGraphics();
 showSoundButton();
+applyComboBox();
 garageUi.render();
 $("sound-btn").addEventListener("click", toggleSound);
+$("combo-toggle").addEventListener("click", toggleComboBox);
 
 // --- minimap: the road is drawn once, then only the dot moves ---
 const map = $("minimap");
@@ -341,6 +400,9 @@ const toMap = (x, z) => [map.width / 2 + x * mapScale, map.height / 2 + z * mapS
 		g.arc(x, y, 3.5, 0, Math.PI * 2);
 		g.fill();
 	}
+	const [gx, gy] = toMap(GARAGE.x, GARAGE.z); // the Smokehouse
+	g.fillStyle = "#20e0ff";
+	g.fillRect(gx - 5, gy - 5, 10, 10);
 }
 function drawMinimap() {
 	mapContext.clearRect(0, 0, map.width, map.height);
@@ -494,6 +556,8 @@ function driveFrame(dt, controls) {
 	effects.update(car, dt);
 	updateCones(dt);
 	updateLap(dt);
+	payBanked();
+	checkBay();
 	updateCamera(dt);
 	sound.update(car, controls, tuning.TopSpeed / CAR.TopSpeed);
 	drawMinimap();
@@ -505,7 +569,7 @@ function driveFrame(dt, controls) {
 	$("preset").textContent = car.preset;
 	$("combo-score").textContent = Math.floor(score.points).toLocaleString();
 	$("combo-multiplier").textContent = `×${score.multiplier.toFixed(2)}`;
-	$("session-score").textContent = score.total.toLocaleString();
+	$("bank-score").textContent = progress.bank.toLocaleString();
 	$("best-score").textContent = score.best.toLocaleString();
 	$("combo-link").value = score.active ? 1 - score.grace / SCORE_RULES.linkTime : 0;
 	$("score-box").classList.toggle("scoring", score.active);
@@ -545,7 +609,7 @@ function advance(seconds, step = 1 / 60) {
 }
 
 // Debug hooks for testing from the browser console: sandbox.override = { throttle: 1, steer: 0, brake: 0, handbrake: false }
-window.sandbox = { car, tuning, score, lap, track, world, garage, openGarage, leaveGarage, garageUi, renderer, scene, camera, advance, sound, override: null };
+window.sandbox = { car, tuning, score, lap, track, world, garage, openGarage, leaveGarage, garageUi, renderer, scene, camera, advance, sound, progress, override: null };
 document.body.classList.add("garage");
 yard.garage.setLit(true);
 fitView();

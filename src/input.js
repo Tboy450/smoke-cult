@@ -11,7 +11,7 @@ function shapeStick(x) {
 
 const MENU_KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
 
-export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onController = () => {}, onGarage = () => {}, onMenu = () => {}, isMenuOpen = () => false, isTouchBlocked = () => false }) {
+export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onController = () => {}, onGarage = () => {}, onCombo = () => {}, onMenu = () => {}, isMenuOpen = () => false, isTouchBlocked = () => false }) {
 	const keys = new Set();
 	const touch = { gas: false, brake: false, handbrake: false, steer: 0 };
 	let device = typeof matchMedia === "function" && matchMedia(TOUCH_LAYOUT_QUERY).matches ? "touch" : "keyboard";
@@ -41,6 +41,7 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 		if (isMenuOpen()) {
 			const step = MENU_KEYS[e.code];
 			if (step) onMenu(step[0], step[1]);
+			else if (!e.repeat && (e.code === "KeyQ" || e.code === "KeyE")) onMenu(e.code === "KeyQ" ? -1 : 1, 0, "tab");
 			else if (!e.repeat && (e.code === "Enter" || e.code === "Space")) onMenu(0, 0, "confirm");
 			else if (!e.repeat && (e.code === "Escape" || e.code === "KeyG")) onMenu(0, 0, "back");
 			else return;
@@ -59,6 +60,7 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 		if (e.code === "KeyC") onCamera();
 		if (e.code === "KeyM") onMute();
 		if (e.code === "KeyG") onGarage();
+		if (e.code === "KeyH") onCombo();
 		if (e.code === "Space") e.preventDefault();
 	});
 	addEventListener("keyup", (e) => keys.delete(e.code));
@@ -150,6 +152,8 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 					if (pressedNow(14) || (stickX < 0 && !stickHeld)) onMenu(-1, 0);
 					if (pressedNow(15) || (stickX > 0 && !stickHeld)) onMenu(1, 0);
 					stickHeld = stickX !== 0 || stickY !== 0;
+					if (pressedNow(4)) onMenu(-1, 0, "tab"); // LB
+					if (pressedNow(5)) onMenu(1, 0, "tab"); // RB
 					if (pressedNow(0)) onMenu(0, 0, "confirm");
 					else if (pressedNow(1) || pressedNow(9)) onMenu(0, 0, "back");
 				} else {

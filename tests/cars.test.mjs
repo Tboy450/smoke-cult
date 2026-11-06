@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { CAR } from '../src/tuning.js';
 import { CARS } from '../src/cars.js';
 import { carAxes, createCar, stepCar } from '../src/physics.js';
-import { createGarageState, moveGarage, OPTIONS, picked, ROWS, saveData, stepOption } from '../src/garageState.js';
+import { createGarageState, currentRow, moveGarage, OPTIONS, picked, saveData, stepOption } from '../src/garageState.js';
 
 const dt = 1 / 240;
 const idle = { throttle: 0, brake: 0, steer: 0, handbrake: false };
@@ -68,9 +68,9 @@ test('every car has a unique id, a sane shape and its own feel', () => {
 
 test('garage navigation wraps, changes only the focused row and saves', () => {
   const state = createGarageState();
-  assert.equal(state.row, 0);
+  assert.equal(currentRow(state), 'car');
   moveGarage(state, 0, -1);
-  assert.equal(ROWS[state.row].key, 'graphics', 'up from the top wraps to the bottom');
+  assert.equal(currentRow(state), 'rims', 'up from the top wraps to the bottom of the tab');
   moveGarage(state, 0, 1);
   assert.equal(moveGarage(state, 1, 0), 'car');
   assert.equal(picked(state, 'car').id, CARS[1].id);
@@ -78,18 +78,18 @@ test('garage navigation wraps, changes only the focused row and saves', () => {
   moveGarage(state, -1, 0);
   assert.equal(picked(state, 'car').id, CARS.at(-1).id, 'left from the first car wraps');
   moveGarage(state, 0, 1);
-  assert.equal(moveGarage(state, 1, 0), 'paint');
+  assert.equal(moveGarage(state, 1, 0), 'kit');
   assert.equal(picked(state, 'car').id, CARS.at(-1).id, 'other rows stay put');
   stepOption(state, 'place', 1);
-  assert.equal(picked(state, 'place').id, 'pad');
+  assert.equal(picked(state, 'place').id, 'track');
 
   const again = createGarageState(JSON.parse(JSON.stringify(saveData(state))));
-  for (const { key } of ROWS) assert.equal(picked(again, key).id, picked(state, key).id);
+  for (const key of Object.keys(OPTIONS)) assert.equal(picked(again, key).id, picked(state, key).id);
 });
 
 test('bad or missing saved data falls back safely', () => {
   const state = createGarageState({ car: 'not-a-car', paint: 12, glow: null });
-  for (const { key } of ROWS) assert.ok(OPTIONS[key][state[key]], key);
+  for (const key of Object.keys(OPTIONS)) assert.ok(OPTIONS[key][state[key]], key);
   assert.equal(picked(createGarageState(null, true), 'graphics').id, 'low', 'phones start on low graphics');
   assert.equal(picked(createGarageState({ graphics: 'high' }, true), 'graphics').id, 'high', 'a saved choice wins');
 });

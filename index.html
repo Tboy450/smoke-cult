@@ -70,11 +70,39 @@
 				background: #d81830; font-size: 22px; font-weight: 900; letter-spacing: 0.1em; }
 			body.touch #minimap { top: 150px; right: 10px; width: 100px; height: 100px; }
 
-			#garage { display: none; position: fixed; z-index: 5; top: 0; bottom: 0; left: 0; width: min(410px, 100vw); padding: 18px 18px 16px;
-				flex-direction: column; gap: 8px; overflow-y: auto; touch-action: pan-y; background: linear-gradient(90deg, rgba(10, 4, 16, 0.94) 72%, rgba(10, 4, 16, 0)); }
+			#garage { display: none; position: fixed; z-index: 5; top: 0; bottom: 0; left: 0; width: min(410px, 100vw); padding: 16px 18px 14px;
+				flex-direction: column; gap: 7px; overflow-y: auto; touch-action: pan-y; background: linear-gradient(90deg, rgba(10, 4, 16, 0.94) 72%, rgba(10, 4, 16, 0)); }
 			body.garage #garage { display: flex; }
 			body.garage .hud, body.garage .touch-ui, body.garage #touch-garage, body.garage #sound-btn { display: none !important; }
-			#garage-brand { font-weight: 900; letter-spacing: 0.14em; font-size: 13px; opacity: 0.85; }
+			#garage-brand { display: flex; justify-content: space-between; font-weight: 900; letter-spacing: 0.14em; font-size: 13px; }
+			#garage-bankbox { color: #d3b5dc; letter-spacing: 0.08em; font-size: 12px; }
+			#garage-bank { color: #ffd23f; font-size: 15px; }
+			#garage-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+			.gtab { min-height: 34px; padding: 0; border: 0; border-radius: 5px; background: rgba(255, 255, 255, 0.07); color: #d3b5dc; cursor: pointer;
+				font: 800 11px "Segoe UI", system-ui, sans-serif; letter-spacing: 0.05em; }
+			.gtab.on { background: var(--pink); color: #fff; }
+			.grow.hascolor { grid-template-columns: 92px 34px 1fr 34px 34px; }
+			.gwheel { width: 26px; height: 26px; padding: 0; justify-self: center; border: 2px solid #fff; border-radius: 50%; cursor: pointer;
+				background: conic-gradient(#f33, #fd3, #3f6, #3df, #63f, #f3c, #f33); }
+			.grow.gpart { grid-template-columns: 1fr auto 76px; gap: 8px; padding: 4px 6px 4px 8px; }
+			.gpname b { display: block; font-size: 12px; letter-spacing: 0.06em; }
+			.gpname small { display: block; font-size: 10px; color: #a78fb0; }
+			.gpips { display: flex; gap: 3px; }
+			.gpips i { width: 9px; height: 15px; border-radius: 2px; background: rgba(255, 255, 255, 0.14); }
+			.gpips i.on { background: var(--pink); }
+			.gbuy { min-height: 32px; padding: 0 4px; border: 1px solid #503a60; border-radius: 5px; background: #2a1838; color: #a78fb0; cursor: pointer;
+				font: 800 12px "Segoe UI", system-ui, sans-serif; }
+			.gbuy.can { border-color: #ffd23f; color: #ffd23f; }
+			#garage-note { margin: 0; min-height: 15px; font-size: 12px; color: #ffd23f; }
+			#picker { display: none; position: absolute; inset: 0; z-index: 2; padding: 12px; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+				background: rgba(10, 4, 16, 0.96); }
+			#picker.open { display: flex; }
+			#picker-title { font-size: 13px; letter-spacing: 0.12em; }
+			#picker-wheel { width: min(240px, 62vw, 46vh); height: auto; aspect-ratio: 1; touch-action: none; cursor: crosshair; }
+			#picker label { display: grid; grid-template-columns: auto 1fr 26px; gap: 8px; align-items: center; width: min(280px, 100%); font-size: 10px; letter-spacing: 0.1em; color: #d3b5dc; }
+			#picker-value { width: 100%; accent-color: var(--pink); touch-action: auto; }
+			#picker-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; }
+			#picker-done { min-height: 38px; width: min(280px, 100%); border: 0; border-radius: 6px; background: var(--pink); color: #fff; cursor: pointer; font: 900 13px "Segoe UI", system-ui, sans-serif; letter-spacing: 0.08em; }
 			#garage-brand b { color: var(--pink); }
 			#garage-name { margin: 4px 0 0; font-size: 34px; line-height: 1.05; font-weight: 900; font-style: italic; }
 			#garage-tag { margin: 0; font-size: 13px; color: #d3b5dc; min-height: 18px; }
@@ -115,7 +143,15 @@
 			#tune-close { float: right; }
 			#score-box { top: 85px; left: 16px; width: 260px; padding: 12px 14px; border-left: 3px solid #74537d;
 				background: rgba(18, 8, 26, .8); border-radius: 0 8px 8px 0; font-variant-numeric: tabular-nums; }
+			#score-box { z-index: 2; }
 			#score-box.scoring { border-color: var(--pink); }
+			#combo-toggle { position: absolute; top: 3px; right: 3px; width: 28px; height: 28px; padding: 0; pointer-events: auto; cursor: pointer; border: 0; border-radius: 5px;
+				background: rgba(255, 255, 255, 0.13); color: #fff; font: 800 17px/1 "Segoe UI", system-ui, sans-serif; }
+			#score-box.small, body.touch #score-box.small { width: 158px; padding: 5px 34px 5px 10px; }
+			#score-box.small .score-label, #score-box.small #score-feedback, #score-box.small #score-totals, #score-box.small #lap-line { display: none; }
+			#score-box.small #combo-score, body.touch #score-box.small #combo-score { font-size: 20px; }
+			#score-box.small #combo-multiplier, body.touch #score-box.small #combo-multiplier { font-size: 14px; padding-top: 5px; }
+			#score-box.small #combo-link { margin: 2px 0 0; height: 3px; }
 			.score-label { font-size: 10px; letter-spacing: .13em; color: #d3b5dc; }
 			#combo-score { font-size: 32px; font-weight: 900; }
 			#combo-multiplier { float: right; color: #ffd23f; font-size: 22px; font-weight: 800; padding-top: 8px; }
@@ -164,10 +200,11 @@
 		<div class="hud" id="preset-box">ASSIST <span id="preset"></span></div>
 		<section class="hud" id="score-box" aria-label="Drift scoring">
 			<div class="score-label">DRIFT COMBO</div>
+			<button id="combo-toggle" aria-label="Shrink or expand the combo box" tabindex="-1">–</button>
 			<span id="combo-score">0</span><span id="combo-multiplier">×1.00</span>
 			<progress id="combo-link" max="1" value="0" aria-label="Time remaining to link another drift"></progress>
 			<div id="score-feedback">Build speed · 29 km/h to score</div>
-			<div id="score-totals">SESSION <span id="session-score">0</span> · BEST COMBO <span id="best-score">0</span></div>
+			<div id="score-totals">BANK <span id="bank-score">0</span> · BEST COMBO <span id="best-score">0</span></div>
 			<div id="lap-line"></div>
 		</section>
 		<canvas class="hud" id="minimap" width="220" height="220" aria-label="Track map"></canvas>
@@ -183,13 +220,21 @@
 		<button id="sound-btn" aria-label="Turn sound on or off">SOUND ON</button>
 
 		<section id="garage" aria-label="Garage">
-			<div id="garage-brand">SMOKE <b>CULT</b> · GARAGE</div>
+			<div id="garage-brand"><span>THE <b>SMOKEHOUSE</b></span><span id="garage-bankbox">BANK <b id="garage-bank">0</b></span></div>
 			<h1 id="garage-name"></h1>
 			<p id="garage-tag"></p>
 			<div id="garage-stats"></div>
+			<div id="garage-tabs"></div>
 			<div id="garage-rows"></div>
+			<p id="garage-note"></p>
 			<button id="garage-drive" tabindex="-1"></button>
-			<p id="garage-help">Controller: D-pad or stick to choose, A to drive, View for tuning. Keyboard: arrows to choose, Enter to drive, Tab for tuning.</p>
+			<p id="garage-help">Controller: D-pad to choose, LB/RB for tabs, A to buy, pick a color or drive, Menu to leave. Keyboard: arrows, Q/E for tabs, Enter to buy, pick a color or drive.</p>
+			<div id="picker">
+				<b id="picker-title"></b>
+				<canvas id="picker-wheel" width="240" height="240" aria-label="Color wheel"></canvas>
+				<label>BRIGHTNESS <input id="picker-value" type="range" min="0" max="100" /> <span id="picker-swatch"></span></label>
+				<button id="picker-done" tabindex="-1">DONE</button>
+			</div>
 		</section>
 
 		<div id="tune">

@@ -21,7 +21,11 @@ const CONTROL = [
 
 export const PAD = { minX: -112, maxX: 82, minZ: -92, maxZ: 112 };
 export const PADDOCK = { minX: 82, maxX: 146, minZ: -12, maxZ: 56 };
+// The Smokehouse: the garage and hangout. Its open side faces the track, so you can drive in and out.
 export const GARAGE = { x: 106, z: 22, halfX: 13, halfZ: 11 };
+
+// The bay in the middle of the floor. Slowing down here opens the garage.
+export const inGarageBay = (x, z) => Math.abs(x - GARAGE.x) < 7 && Math.abs(z - GARAGE.z) < 6;
 
 // Solid blocks in the infield: [centre x, centre z, half x, half z, turn in radians].
 const INFIELD_BLOCKS = [
@@ -143,7 +147,13 @@ export function buildTrack() {
 
 	// Tire walls on the inside of the same corners, a few metres off the road. Solid from both sides.
 	const blocks = INFIELD_BLOCKS.map(([x, z, hx, hz, turn]) => ({ x, z, hx, hz, turn, kind: "container" }));
-	blocks.push({ x: GARAGE.x, z: GARAGE.z, hx: GARAGE.halfX, hz: GARAGE.halfZ, turn: 0, kind: "garage" });
+	for (const [x, z, hx, hz] of [
+		[GARAGE.x - GARAGE.halfX, GARAGE.z, 0.35, GARAGE.halfZ],
+		[GARAGE.x, GARAGE.z - GARAGE.halfZ, GARAGE.halfX, 0.35],
+		[GARAGE.x, GARAGE.z + GARAGE.halfZ, GARAGE.halfX, 0.35],
+		[GARAGE.x - 9.6, GARAGE.z + 8.4, 3.2, 2.4], // the hangout corner: sofas and the fire drum
+		[GARAGE.x - 12.2, GARAGE.z - 5.4, 0.7, 4.2], // tool chests and spare tires along the back wall
+	]) blocks.push({ x, z, hx, hz, turn: 0, kind: "garage" });
 	for (const zone of zones) {
 		for (let j = -5; j <= 5; j += 2) {
 			const p = samples[wrap(zone.apex + j, n)];

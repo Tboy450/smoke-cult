@@ -524,15 +524,55 @@ function buildGarage(scene) {
 	for (let i = 0; i < 5; i++) {
 		for (let level = 0; level < 2; level++) {
 			const t = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.13, 8, 18).rotateY(Math.PI / 2), tire);
-			t.position.set(-halfX + 0.55, 0.47 + level * 0.92, 5 + i * 0.5);
+			t.position.set(-halfX + 0.55, 0.47 + level * 0.92, -3.6 + i * 0.5);
 			group.add(t);
 		}
 	}
-	const banner = new THREE.Mesh(new THREE.PlaneGeometry(13, 3.25), new THREE.MeshBasicMaterial({ map: sign("SMOKE CULT GARAGE"), toneMapped: false }));
+	// The hangout corner: sofas around an oil-drum fire, facing the bay.
+	const sofa = new THREE.MeshStandardMaterial({ color: 0x3a1a44, roughness: 0.75 });
+	for (const [px, pz, w, d] of [[-8, 9.8, 5, 1.1], [-11.8, 7, 1.1, 4]]) {
+		add(w, 0.5, d, px, 0.28, pz, sofa);
+		add(w * (d > w ? 0.34 : 1), 0.55, d * (d > w ? 1 : 0.34), px + (d > w ? -0.4 : 0), 0.8, pz + (d > w ? 0 : 0.4), sofa);
+	}
+	const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1, 14), new THREE.MeshStandardMaterial({ color: 0x4a2a1a, metalness: 0.5, roughness: 0.7 }));
+	drum.position.set(-8.8, 0.5, 7.4);
+	drum.castShadow = true;
+	group.add(drum);
+	const fire = new THREE.Sprite(new THREE.SpriteMaterial({
+		map: canvasTexture(64, 64, (g, w, h) => {
+			const glow = g.createRadialGradient(w / 2, h * 0.62, 2, w / 2, h / 2, w / 2);
+			glow.addColorStop(0, "rgba(255,230,150,1)");
+			glow.addColorStop(0.45, "rgba(255,120,30,0.75)");
+			glow.addColorStop(1, "rgba(255,60,0,0)");
+			g.fillStyle = glow;
+			g.fillRect(0, 0, w, h);
+		}),
+		transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+	}));
+	fire.position.set(-8.8, 1.35, 7.4);
+	fire.scale.set(1.3, 1.7, 1);
+	group.add(fire);
+
+	// Painted bay at the door, so you can see where to stop.
+	const bay = new THREE.Mesh(new THREE.PlaneGeometry(14, 12).rotateX(-Math.PI / 2), flat({
+		map: canvasTexture(256, 256, (g, w, h) => {
+			g.clearRect(0, 0, w, h);
+			g.strokeStyle = "rgba(32,224,255,0.5)";
+			g.lineWidth = 4;
+			g.setLineDash([26, 16]);
+			g.strokeRect(6, 6, w - 12, h - 12);
+		}),
+		transparent: true,
+		depthWrite: false,
+	}, 5));
+	bay.position.y = 0.03;
+	group.add(bay);
+
+	const banner = new THREE.Mesh(new THREE.PlaneGeometry(13, 3.25), new THREE.MeshBasicMaterial({ map: sign("THE SMOKEHOUSE"), toneMapped: false }));
 	banner.position.set(-halfX + 0.25, 4.5, 0);
 	banner.rotation.y = Math.PI / 2;
 	group.add(banner);
-	const outside = new THREE.Mesh(new THREE.PlaneGeometry(13, 2.4), new THREE.MeshBasicMaterial({ map: sign("GARAGE", { color: "#20e0ff" }), toneMapped: false }));
+	const outside = new THREE.Mesh(new THREE.PlaneGeometry(13, 2.4), new THREE.MeshBasicMaterial({ map: sign("THE SMOKEHOUSE", { color: "#20e0ff" }), toneMapped: false }));
 	outside.position.set(halfX + 0.05, height - 0.5, 0);
 	outside.rotation.y = Math.PI / 2;
 	group.add(outside);

@@ -60,10 +60,11 @@ export const RANGES = {
 
 // Counter-steer assist presets. Assist steers the front wheels toward where the car is travelling;
 // SpinGuard slows the spin when the car passes SpinGuardDeg of drift angle.
+// SurfacePenalty is how much of gravel's lost grip and drag you actually feel: 1 is all of it.
 export const PRESETS = {
-	Arcade: { Assist: 0.75, RearSlide: 0.85, SpinGuardDeg: 40, SpinGuard: 4 },
-	Balanced: { Assist: 0.65, RearSlide: 0.8, SpinGuardDeg: 45, SpinGuard: 3.5 },
-	Off: { Assist: 0, RearSlide: 0.7, SpinGuardDeg: 180, SpinGuard: 0 },
+	Arcade: { Assist: 0.75, RearSlide: 0.85, SpinGuardDeg: 40, SpinGuard: 4, SurfacePenalty: 0.4 },
+	Balanced: { Assist: 0.65, RearSlide: 0.8, SpinGuardDeg: 45, SpinGuard: 3.5, SurfacePenalty: 0.7 },
+	Off: { Assist: 0, RearSlide: 0.7, SpinGuardDeg: 180, SpinGuard: 0, SurfacePenalty: 1 },
 };
 export const PRESET_ORDER = ["Arcade", "Balanced", "Off"];
 export const DEFAULT_PRESET = "Balanced";
