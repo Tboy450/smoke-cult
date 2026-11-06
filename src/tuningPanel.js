@@ -6,7 +6,9 @@ export function createTuningPanel(panel, closeButton) {
 	};
 	closeButton.addEventListener("click", close);
 	panel.addEventListener("click", (event) => {
-		if (event.detail > 0 && panel.contains(document.activeElement)) document.activeElement.blur();
+		const focused = document.activeElement;
+		const textControl = focused?.matches?.('textarea, input:not([type="range"])');
+		if (event.detail > 0 && panel.contains(focused) && !textControl) focused.blur();
 	});
 	return {
 		toggle() {

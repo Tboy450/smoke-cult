@@ -44,6 +44,12 @@
 			#tune h3 { font-size: 12px; color: #ffd23f; margin: 16px 0 10px; }
 			#tune .tune-setting { padding: 7px 0; border-bottom: 1px solid #ffffff18; }
 			#tune .tune-setting p, #tune-note { margin: 6px 0 2px; color: #d3b5dc; font-size: 11px; line-height: 1.4; }
+			#tune-export-text { display: block; width: 100%; min-height: 150px; max-height: 40vh; resize: vertical;
+				background: #100917; color: #fff; border: 1px solid #74537d; border-radius: 6px; padding: 8px; font: 11px/1.5 monospace;
+				user-select: text; -webkit-user-select: text; touch-action: auto; }
+			#tune-export-status { color: #ffd23f; font-size: 12px; line-height: 1.4; }
+			#tune .tune-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+			#tune .tune-actions button { min-height: 44px; margin: 0; }
 			#tune button { background: #2a1838; color: var(--ink); border: 1px solid #503a60; border-radius: 6px;
 				padding: 5px 10px; margin: 0 4px 6px 0; cursor: pointer; font: inherit; }
 			#tune button.on { background: var(--pink); border-color: var(--pink); }
@@ -260,10 +266,17 @@
 			</div>
 			<div id="tune-rows" role="tabpanel"></div>
 			<p id="tune-note">Changes apply live. Reset restores this car and its purchased upgrades.</p>
-			<div style="margin-top: 8px">
+			<div class="tune-actions">
 				<button id="tune-reset">Reset to defaults</button>
 				<button id="tune-copy">Copy values</button>
+				<button id="tune-download">Download tuning</button>
+				<button id="tune-show">Show values</button>
 			</div>
+			<p id="tune-export-status" role="status"></p>
+			<section id="tune-export" hidden aria-label="Tuning text export">
+				<textarea id="tune-export-text" readonly aria-label="Tuning values" spellcheck="false"></textarea>
+				<div class="tune-actions"><button id="tune-select">Select all</button><button id="tune-hide">Hide text</button></div>
+			</section>
 		</div>
 
 		<div class="touch-ui">

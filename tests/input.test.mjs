@@ -25,10 +25,11 @@ test('controls release on focus/capture loss, survive reconnects and work around
   let tunes = 0;
   let lastController = null;
   let garages = 0;
+  let cameras = 0;
   let menuOpen = false;
   const menu = [];
   try {
-    const input = createInput({ onPreset() {}, onReset() {}, onCamera() {}, onMute() {}, onTune() { tunes++; }, onGarage() { garages++; }, onMenu(dx, dy, action) { menu.push(action ?? `${dx},${dy}`); }, isMenuOpen: () => menuOpen, onController(standard) { lastController = standard; }, isTouchBlocked: () => blocked });
+    const input = createInput({ onPreset() {}, onReset() {}, onCamera() { cameras++; }, onMute() {}, onTune() { tunes++; }, onGarage() { garages++; }, onMenu(dx, dy, action) { menu.push(action ?? `${dx},${dy}`); }, isMenuOpen: () => menuOpen, onController(standard) { lastController = standard; }, isTouchBlocked: () => blocked });
     emit(win, 'keydown', { code: 'KeyW' });
     input.update(); assert.equal(input.controls.throttle, 1);
     emit(win, 'blur'); input.update(); assert.equal(input.controls.throttle, 0);
@@ -87,6 +88,27 @@ test('controls release on focus/capture loss, survive reconnects and work around
     assert.equal(input.controls.steer, 0, 'arrows stay with the slider');
     assert.equal(input.controls.handbrake, false, 'Space stays with the focused control');
 
+    const exportText = { matches: (selector) => selector.includes('textarea') };
+    const textEvent = (type, code) => {
+      const event = Object.assign(new Event(type, { cancelable: true }), { code, ctrlKey: true });
+      Object.defineProperty(event, 'target', { value: exportText });
+      return event;
+    };
+    emit(win, 'keydown', { code: 'KeyW' }); input.update();
+    assert.equal(input.controls.throttle, 1);
+    doc.dispatchEvent(textEvent('focusin'));
+    input.update(); assert.equal(input.controls.throttle, 0, 'focusing exported text releases held controls');
+    const beforeCopyCamera = cameras, beforeCopyTune = tunes;
+    for (const code of ['KeyC', 'KeyW', 'Tab', 'ArrowLeft']) {
+      const event = textEvent('keydown', code); win.dispatchEvent(event);
+      assert.equal(event.defaultPrevented, false, 'native copying and text navigation remain available');
+    }
+    input.update();
+    assert.equal(input.controls.throttle, 0);
+    assert.equal(input.controls.steer, 0);
+    assert.equal(cameras, beforeCopyCamera, 'copying never switches cameras');
+    assert.equal(tunes, beforeCopyTune, 'Tab inside text uses native focus navigation');
+
     // Controllers the browser does not call "standard".
     const basic = { index: 1, id: 'bluetooth', mapping: '', axes: [0, 0], buttons: Array.from({ length: 10 }, () => ({ value: 0, pressed: false })) };
     basic.buttons[7] = { value: 1, pressed: true };
@@ -121,7 +143,7 @@ test('controls release on focus/capture loss, survive reconnects and work around
     assert.deepEqual(menu, ['0,-1', '1,0', 'confirm', 'back', 'tab']);
     menu.length = 0;
     const rangeArrow = Object.assign(new Event('keydown', { cancelable: true }), { code: 'ArrowRight' });
-    Object.defineProperty(rangeArrow, 'target', { value: { matches: () => true } });
+    Object.defineProperty(rangeArrow, 'target', { value: { matches: (selector) => selector === 'input[type="range"]' } });
     win.dispatchEvent(rangeArrow);
     assert.equal(rangeArrow.defaultPrevented, false, 'garage brightness slider keeps native arrow adjustments');
     assert.equal(menu.length, 0, 'slider adjustment must not move the color wheel or garage selection');

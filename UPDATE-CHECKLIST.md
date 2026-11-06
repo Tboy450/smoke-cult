@@ -1,6 +1,6 @@
 # SMOKE CULT — update checklist
 
-Updated November 6, 2026. Current update: Simple and Advanced live tuning with readable labels, units and explanations.
+Updated November 6, 2026. Current update: usable tuning export when clipboard access is blocked, plus downloadable tuning snapshots.
 Prior recovered garage update: `ff2879e`.
 
 This is the shared checklist for continuing SMOKE CULT. Update it whenever a feature is completed,
@@ -32,6 +32,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Live tuning with keyboard/controller driving while adjusting settings.
 - [x] Simple tuning for six everyday settings; Advanced groups every existing slider by purpose.
 - [x] Tuning labels, explanations and unit conversions for display; opening/switching modes preserves exact car and upgrade values.
+- [x] Clipboard tuning export with selected on-screen text fallback, Show values and car-named JSON downloads.
 - [x] Assist-dependent gravel behavior, including grip, drag and braking.
 - [x] Recovered Claude's uncommitted update, backed it up, committed all required modules and published it.
 
@@ -41,6 +42,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] New automated regressions cover pointer ownership, drag cancellation, brightness controls, custom-color saving and compact-HUD defaults/persistence.
 - [x] All 69 Node tests and scripted physics checks passed after the HUD and picker fixes.
 - [x] All 73 Node tests and scripted physics checks passed after Simple/Advanced tuning; tests cover exact-value preservation, units, edits and keyboard tab selection.
+- [x] All 78 Node tests and scripted physics checks passed after export improvements; missing/denied clipboard, download contents/failure, delayed responses and text-selection controls are covered.
 - [x] User reports the game seems to work on their phone (basic play feedback, November 6).
 - [x] Headless physics checks passed for Arcade, Balanced and Off.
 - [x] All source JavaScript files passed syntax checks.
@@ -71,7 +73,7 @@ Their basic phone check is recorded above; it does not close the detailed checks
 
 - [x] Friendly Simple and Advanced tuning tabs instead of only raw sliders.
 - [ ] Improve non-standard controller mapping; current fallback guesses the layout.
-- [ ] Make tuning export usable when clipboard access is blocked on LAN HTTP.
+- [x] Make tuning export usable when clipboard access is blocked on LAN HTTP.
 - [ ] Review keyboard focus, screen sizes, contrast and control accessibility in the recovered garage.
 - [ ] Original Blender/Houdini car and helmeted driver models; code-built models are still placeholders.
 - [ ] More original maps, starting with a mountain touge if that remains the chosen direction.

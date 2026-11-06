@@ -35,6 +35,12 @@ test('keyboard tuning retains focus; pointer completion and closing return focus
     closeButton.dispatchEvent(new Event('click'));
     assert.ok(!classes.has('open'));
     assert.equal(blurs, 3);
+    slider.matches = () => true; // Read-only tuning text also lives in this panel.
+    document.activeElement = slider;
+    click(1);
+    assert.equal(blurs, 3, 'pointer selection of exported text must not lose focus');
+    closeButton.dispatchEvent(new Event('click'));
+    assert.equal(blurs, 4, 'closing still releases text focus');
     document.activeElement = outside;
     click(1);
     tuning.toggle(); tuning.toggle();

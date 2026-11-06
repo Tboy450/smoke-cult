@@ -14,6 +14,7 @@ import { buildTrack, collideCar, createLap, createTrackWorld, GARAGE, inGarageBa
 import { CAR, PRESET_ORDER } from "./tuning.js";
 import { createTuningPanel } from "./tuningPanel.js";
 import { createTuningControls } from "./tuningUi.js";
+import { createTuningExport } from "./tuningExport.js";
 import { buy, carTuning, createProgress, earn, levelsFor } from "./upgrades.js";
 import { buildYard } from "./yard.js";
 
@@ -252,15 +253,8 @@ $("tune-reset").addEventListener("click", () => {
 	Object.assign(tuning, baseTuning());
 	syncTuningSliders();
 });
-$("tune-copy").addEventListener("click", async () => {
-	const text = JSON.stringify(tuning, null, "\t");
-	try {
-		await navigator.clipboard.writeText(text);
-		flash("Tuning copied");
-	} catch {
-		console.log(text);
-		flash("Tuning printed to console");
-	}
+createTuningExport($("tune"), () => tuning, {
+	filename: () => `smoke-cult-${currentCar().id}-tuning.json`,
 });
 
 // --- garage ---

@@ -31,8 +31,12 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 		keys.clear();
 		clearTouch();
 	};
+	const isTextControl = (target) => target?.matches?.('textarea, input:not([type="range"])') || target?.isContentEditable;
+	document.addEventListener("focusin", (e) => { if (isTextControl(e.target)) clear(); });
 
 	addEventListener("keydown", (e) => {
+		// Copy/select shortcuts and normal text navigation must never operate the car or open menus.
+		if (isTextControl(e.target)) return;
 		if (e.code === "Tab") {
 			e.preventDefault();
 			if (!e.repeat) onTune();
