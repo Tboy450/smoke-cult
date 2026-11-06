@@ -30,14 +30,20 @@
 			#flash { top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 30px; font-weight: 900; opacity: 0;
 				transition: opacity 0.3s; letter-spacing: 0.1em; }
 
-			#tune { position: fixed; top: 44px; right: 12px; width: 330px; max-height: calc(100vh - 60px); overflow: auto;
+			#tune { position: fixed; top: 44px; right: 12px; width: 360px; max-height: calc(100vh - 60px); overflow: auto;
 				background: var(--panel); border: 1px solid rgba(255, 42, 160, 0.4); border-radius: 10px; padding: 12px;
 				display: none; font-size: 12px; }
 			#tune.open { display: block; }
 			#tune h2 { margin: 0 0 8px; font-size: 14px; letter-spacing: 0.1em; color: var(--pink); }
-			#tune label { display: grid; grid-template-columns: 120px 1fr 48px; gap: 6px; align-items: center; margin: 3px 0; }
+			#tune label { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(60px, 1fr) 80px; gap: 6px; align-items: center; margin: 3px 0; }
 			#tune output { text-align: right; font-variant-numeric: tabular-nums; }
-			#tune input { width: 100%; accent-color: var(--pink); }
+			#tune input { width: 100%; min-width: 0; accent-color: var(--pink); }
+			#tune-tabs { display: flex; gap: 6px; margin: 6px 0 12px; }
+			#tune-tabs button { flex: 1; min-height: 44px; margin: 0; }
+			#tune-tabs button:focus-visible { outline: 2px solid #ffd23f; outline-offset: 2px; }
+			#tune h3 { font-size: 12px; color: #ffd23f; margin: 16px 0 10px; }
+			#tune .tune-setting { padding: 7px 0; border-bottom: 1px solid #ffffff18; }
+			#tune .tune-setting p, #tune-note { margin: 6px 0 2px; color: #d3b5dc; font-size: 11px; line-height: 1.4; }
 			#tune button { background: #2a1838; color: var(--ink); border: 1px solid #503a60; border-radius: 6px;
 				padding: 5px 10px; margin: 0 4px 6px 0; cursor: pointer; font: inherit; }
 			#tune button.on { background: var(--pink); border-color: var(--pink); }
@@ -139,7 +145,7 @@
 				.gvalue { font-size: 12px; }
 				#garage-drive { min-height: 40px; }
 			}
-			#tune { z-index: 10; width: min(330px, calc(100vw - 24px)); touch-action: pan-y; }
+			#tune { z-index: 10; width: min(360px, calc(100vw - 24px)); touch-action: pan-y; }
 			#tune input { touch-action: auto; }
 			#tune-close { float: right; }
 			#score-box { top: 85px; left: 16px; width: 260px; padding: 12px 14px; border-left: 3px solid #74537d;
@@ -248,7 +254,12 @@
 			<button id="tune-close" aria-label="Close tuning">Close</button>
 			<h2>TUNING (live)</h2>
 			<div id="tune-presets"></div>
-			<div id="tune-rows"></div>
+			<div id="tune-tabs" role="tablist" aria-label="Tuning detail">
+				<button id="tune-tab-simple" type="button" role="tab" data-mode="simple" aria-controls="tune-rows">Simple</button>
+				<button id="tune-tab-advanced" type="button" role="tab" data-mode="advanced" aria-controls="tune-rows">Advanced</button>
+			</div>
+			<div id="tune-rows" role="tabpanel"></div>
+			<p id="tune-note">Changes apply live. Reset restores this car and its purchased upgrades.</p>
 			<div style="margin-top: 8px">
 				<button id="tune-reset">Reset to defaults</button>
 				<button id="tune-copy">Copy values</button>

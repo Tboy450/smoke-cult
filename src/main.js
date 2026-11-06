@@ -11,8 +11,9 @@ import { createCar, fitCar, placeCar, resetCar, stepCar, carAxes } from "./physi
 import { awardBonus, createScore, stepScore, finishScore, SCORE_RULES } from "./scoring.js";
 import { createSound } from "./sound.js";
 import { buildTrack, collideCar, createLap, createTrackWorld, GARAGE, inGarageBay, nearestSample, resetLap, stepLap, zoneAt } from "./track.js";
-import { CAR, PRESET_ORDER, RANGES } from "./tuning.js";
+import { CAR, PRESET_ORDER } from "./tuning.js";
 import { createTuningPanel } from "./tuningPanel.js";
+import { createTuningControls } from "./tuningUi.js";
 import { buy, carTuning, createProgress, earn, levelsFor } from "./upgrades.js";
 import { buildYard } from "./yard.js";
 
@@ -228,30 +229,9 @@ function flash(text) {
 }
 
 // --- tuning panel ---
-const tuneRows = $("tune-rows");
-const sliderViews = [];
-for (const [name, [min, max, step]] of Object.entries(RANGES)) {
-	const row = document.createElement("label");
-	row.innerHTML = `<span>${name}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
-	const slider = row.querySelector("input");
-	const out = row.querySelector("output");
-	const show = () => (out.textContent = Number(tuning[name]).toFixed(step < 0.01 ? 4 : step < 1 ? 2 : 0));
-	slider.value = tuning[name];
-	show();
-	slider.addEventListener("input", () => {
-		tuning[name] = Number(slider.value);
-		show();
-	});
-	sliderViews.push(() => {
-		slider.value = tuning[name];
-		show();
-	});
-	row.dataset.name = name;
-	tuneRows.appendChild(row);
-}
-// Only shows the numbers. Sliders round to their step, so they must never write a car's real values back.
+const tuningControls = createTuningControls($("tune-rows"), Array.from(document.querySelectorAll("#tune-tabs button")), tuning);
 function syncTuningSliders() {
-	for (const view of sliderViews) view();
+	tuningControls.sync();
 }
 function syncPresetButtons() {
 	for (const b of document.querySelectorAll("#tune-presets button")) b.classList.toggle("on", b.dataset.preset === car.preset);

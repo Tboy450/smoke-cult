@@ -11,7 +11,10 @@ export function createTuningPanel(panel, closeButton) {
 	return {
 		toggle() {
 			if (panel.classList.contains("open")) close();
-			else panel.classList.add("open");
+			else {
+				panel.classList.add("open");
+				panel.querySelector?.('[role="tab"][aria-selected="true"]')?.focus();
+			}
 		},
 	};
 }

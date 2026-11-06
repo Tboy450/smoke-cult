@@ -1,6 +1,6 @@
 # SMOKE CULT — update checklist
 
-Updated November 6, 2026. Current update: compact mobile score/lap panel and color-picker control fixes.
+Updated November 6, 2026. Current update: Simple and Advanced live tuning with readable labels, units and explanations.
 Prior recovered garage update: `ff2879e`.
 
 This is the shared checklist for continuing SMOKE CULT. Update it whenever a feature is completed,
@@ -30,6 +30,8 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Color-wheel brightness through Q/E or controller LB/RB, native keyboard slider input and percentage display.
 - [x] Color wheel tracks one finger and stops on release, lost pointer capture, cancellation or picker closure.
 - [x] Live tuning with keyboard/controller driving while adjusting settings.
+- [x] Simple tuning for six everyday settings; Advanced groups every existing slider by purpose.
+- [x] Tuning labels, explanations and unit conversions for display; opening/switching modes preserves exact car and upgrade values.
 - [x] Assist-dependent gravel behavior, including grip, drag and braking.
 - [x] Recovered Claude's uncommitted update, backed it up, committed all required modules and published it.
 
@@ -38,6 +40,8 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] All 65 Node tests passed for the recovered update, including the HTTP test with localhost access enabled.
 - [x] New automated regressions cover pointer ownership, drag cancellation, brightness controls, custom-color saving and compact-HUD defaults/persistence.
 - [x] All 69 Node tests and scripted physics checks passed after the HUD and picker fixes.
+- [x] All 73 Node tests and scripted physics checks passed after Simple/Advanced tuning; tests cover exact-value preservation, units, edits and keyboard tab selection.
+- [x] User reports the game seems to work on their phone (basic play feedback, November 6).
 - [x] Headless physics checks passed for Arcade, Balanced and Off.
 - [x] All source JavaScript files passed syntax checks.
 - [x] AI lap, upgraded-car handling, gravel, color math, save-state and purchase checks passed.
@@ -46,9 +50,13 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] GitHub Pages build and public availability of recovered color-wheel markup, decals and upgrade code verified.
 
 The browser checker timed out during recovery and again during this follow-up. The earlier visual checks do **not**
-cover the recovered garage or current HUD/control changes. New interaction checks use drawing stubs, not visual rendering.
+cover the recovered garage, current HUD/control changes or new tuning layout. New interaction checks use drawing/DOM
+stubs, not visual rendering. Detailed visual and device checks remain deferred at the user's request.
 
-## Next: verify the recovered update
+## Deferred device and visual testing
+
+The user asked to leave detailed phone/controller testing for later and continue feature updates.
+Their basic phone check is recorded above; it does not close the detailed checks below.
 
 - [ ] Visually check every decal on all five cars, including roof/side placement and color changes.
 - [ ] Try the color wheel, brightness, body kits and wheel styles on desktop and phone.
@@ -61,7 +69,7 @@ cover the recovered garage or current HUD/control changes. New interaction check
 
 ## Improvements still open
 
-- [ ] Friendly Simple and Advanced tuning tabs instead of only raw sliders.
+- [x] Friendly Simple and Advanced tuning tabs instead of only raw sliders.
 - [ ] Improve non-standard controller mapping; current fallback guesses the layout.
 - [ ] Make tuning export usable when clipboard access is blocked on LAN HTTP.
 - [ ] Review keyboard focus, screen sizes, contrast and control accessibility in the recovered garage.

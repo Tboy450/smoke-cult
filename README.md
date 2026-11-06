@@ -33,6 +33,12 @@ depending on the selected row. Keyboard: arrows, Q/E for tabs and Enter to selec
 With a color wheel open, arrows/D-pad adjust hue and saturation; Q/E or LB/RB adjust brightness.
 The brightness slider also accepts normal keyboard arrow adjustments.
 
+**Live tuning:** open TUNE (Tab on keyboard, View on controller). Simple offers acceleration, front/rear grip,
+steering angle, brakes and bounce control with short explanations. Advanced includes all settings in groups,
+with readable units such as km/h, kg, degrees and suspension travel in cm. Left/right arrows switch a focused
+tuning tab. Reset restores the selected car including its purchased upgrades; Copy values exports the underlying
+handling numbers. Manual tuning is live and is not automatically saved between visits.
+
 **Less HUD on phones:** tap **−** on the score/lap panel to collapse it into a short score strip; tap **+** to restore
 the full panel. H does the same on keyboard. The choice is remembered; new mobile sessions start compact.
 
