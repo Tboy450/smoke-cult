@@ -127,7 +127,7 @@ function instanced(geometry, material, items, place) {
 	return mesh;
 }
 
-function buildSky(scene, renderer) {
+function buildSky(scene, renderer, group) {
 	const texture = canvasTexture(16, 512, (g, w, h) => {
 		const grad = g.createLinearGradient(0, 0, 0, h);
 		grad.addColorStop(0, "#150a2e");
@@ -144,7 +144,7 @@ function buildSky(scene, renderer) {
 		new THREE.SphereGeometry(1100, 32, 24),
 		new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false }),
 	);
-	scene.add(sky);
+	group.add(sky);
 
 	// Reflections for paint and glass come from this same sky.
 	const envScene = new THREE.Scene();
@@ -175,7 +175,7 @@ function buildSky(scene, renderer) {
 	const g = new THREE.BufferGeometry();
 	g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
 	g.setIndex(index);
-	scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x2c1838, side: THREE.DoubleSide, fog: false, toneMapped: false })));
+	group.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x2c1838, side: THREE.DoubleSide, fog: false, toneMapped: false })));
 }
 
 function buildGround(scene, track) {
@@ -590,10 +590,13 @@ function buildGarage(scene) {
 }
 
 export function buildYard(scene, renderer, track) {
-	buildSky(scene, renderer);
-	buildGround(scene, track);
-	buildBarriers(scene, track);
-	buildScenery(scene, track);
-	buildGantry(scene, track);
-	return { garage: buildGarage(scene) };
+	const group = new THREE.Group();
+	buildSky(scene, renderer, group);
+	buildGround(group, track);
+	buildBarriers(group, track);
+	buildScenery(group, track);
+	buildGantry(group, track);
+	const garage = buildGarage(group);
+	scene.add(group);
+	return { group, garage };
 }

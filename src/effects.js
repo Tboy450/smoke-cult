@@ -52,7 +52,7 @@ export function createEffects(scene) {
 					lastMark[name] = null;
 					continue;
 				}
-				const p = new THREE.Vector3(w.contact[0], 0.012, w.contact[2]);
+				const p = new THREE.Vector3(w.contact[0], w.contact[1] + 0.012, w.contact[2]);
 				// Smoke, more the harder the tire slides.
 				const spawn = !w.def.front && Math.random() < Math.min(1, (w.slip - 2) / 6) * dt * 60;
 				if (spawn) {
@@ -61,7 +61,7 @@ export function createEffects(scene) {
 					puff.life = puff.maxLife = 1.4 + Math.random() * 1.2;
 					puff.spark = false;
 					puff.sprite.material.color.copy(smokeColor);
-					puff.sprite.position.set(p.x, 0.35, p.z);
+					puff.sprite.position.set(p.x, p.y + 0.35, p.z);
 					puff.vel.set((Math.random() - 0.5) * 1.2, 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * 1.2);
 					puff.sprite.visible = true;
 				}
@@ -97,21 +97,26 @@ export function createEffects(scene) {
 			smokeColor.setHex(color);
 		},
 		// A shower of sparks where the car touches a wall.
-		sparks(x, z, amount) {
+		sparks(x, z, amount, groundY = 0) {
 			for (let i = 0; i < amount; i++) {
 				const puff = puffs[nextPuff];
 				nextPuff = (nextPuff + 1) % puffs.length;
 				puff.spark = true;
 				puff.life = puff.maxLife = 0.25 + Math.random() * 0.35;
 				puff.sprite.material.color.copy(sparkColor);
-				puff.sprite.position.set(x, 0.4 + Math.random() * 0.4, z);
+				puff.sprite.position.set(x, groundY + 0.4 + Math.random() * 0.4, z);
 				puff.vel.set((Math.random() - 0.5) * 12, 1 + Math.random() * 4, (Math.random() - 0.5) * 12);
 				puff.sprite.visible = true;
 			}
 		},
-		clearSkids() {
+		clear() {
 			skidMesh.count = 0;
 			nextSkid = 0;
+			for (const name of Object.keys(lastMark)) delete lastMark[name];
+			for (const puff of puffs) {
+				puff.life = 0;
+				puff.sprite.visible = false;
+			}
 		},
 	};
 }

@@ -71,6 +71,7 @@ export const OPTIONS = {
 		{ id: "smokehouse", name: "Out the Door" },
 		{ id: "track", name: "Start Line" },
 		{ id: "pad", name: "Test Pad" },
+		{ id: "touge", name: "Cinder Pass" },
 	],
 	sound: [
 		{ id: "on", name: "On" },

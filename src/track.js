@@ -274,9 +274,14 @@ function contactAt(cells, x, z) {
 	return best;
 }
 
+export function createTrackContact(track) {
+	const cells = buildContactGrid(track);
+	return (x, z) => contactAt(cells, x, z);
+}
+
 export function createTrackWorld(track) {
 	const surface = buildSurfaceGrid(track);
-	const cells = buildContactGrid(track);
+	const contact = createTrackContact(track);
 	const gripAt = (x, z) => {
 		const cx = Math.floor((x + WORLD_HALF) / SURFACE_CELL);
 		const cz = Math.floor((z + WORLD_HALF) / SURFACE_CELL);
@@ -292,7 +297,7 @@ export function createTrackWorld(track) {
 			if (hit) hit.grip = gripAt(hit.position[0], hit.position[2]);
 			return hit;
 		},
-		contact: (x, z) => contactAt(cells, x, z),
+		contact,
 	};
 }
 

@@ -8,6 +8,12 @@ the same site adapts to your screen. The game opens in the garage. Pick a car, p
 **Where you drive:** Rustline Yard, an invented industrial yard with a 1.6 km circuit wrapped around a test pad.
 Walls are solid, gravel has less grip, and hitting a wall hard ends your combo. Cross the start line to time a lap.
 
+**Cinder Pass** is a 613 m timed descent through three mountain hairpins. In **Garage → Game → Drive At**, choose
+**Cinder Pass** and drive out. Cross START, follow the three checkpoint gates in order, then cross FINISH. The minimap
+highlights the next gate and the score strip shows progress. Reset returns you to the start for another run.
+Hold a clean drift near a guardrail to earn 200 points before the combo multiplier. The bonus is available once per
+section between gates. Rail contact interrupts the bonus. The finish banks your active combo and shows time and points.
+
 **Cars:** Cinder 2D, Razor Kei, Mule V8, Soot Wagon and Hex Prototype. All are invented for this game, and each
 has its own handling. Your car and colours are remembered in this browser.
 
@@ -52,8 +58,8 @@ switch can also mute it.
 Link another drift within 1.5 seconds to keep the combo. Clean side changes earn a bonus, and so do the pink clip zones
 on the outside of corners (hold at least 20° through them, once per lap each). Straightening or slowing down banks your
 points after that grace period. Spinouts, hard wall hits, cone hits, resets and assist changes lose the pending combo.
-The upgrade bank, purchased parts and personal bests are saved in this browser. The full score panel shows
-your best banked combo, fastest valid lap and highest valid lap score across cars.
+The upgrade bank, purchased parts and personal bests are saved in this browser. Rustline Yard lap records and Cinder
+Pass descent records are separate, and each route's records are shared across cars. Expand the score panel to see them.
 
 ## Run it locally
 
