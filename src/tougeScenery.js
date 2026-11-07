@@ -49,15 +49,32 @@ function strip(course, left, right, material, lift, tileLength) {
 	return mesh;
 }
 
+function aggregate(context, width, height, base, strength, seed, wear = null) {
+	const noise = random(seed);
+	const pixels = context.createImageData(width, height);
+	for (let y = 0; y < height; y++) {
+		const along = 1 + 0.15 * Math.cos(y * Math.PI * 2 / height);
+		for (let x = 0; x < width; x++) {
+			const i = (y * width + x) * 4;
+			const fleck = noise();
+			const grain = (noise() + noise() - 1) * strength;
+			const chip = fleck > 0.98 ? 9 : fleck < 0.02 ? -7 : 0;
+			const shift = grain + chip - (wear?.[x] ?? 0) * along;
+			for (let channel = 0; channel < 3; channel++) pixels.data[i + channel] = base[channel] + shift;
+			pixels.data[i + 3] = 255;
+		}
+	}
+	context.putImageData(pixels, 0, 0);
+}
+
 function road(course, group) {
 	const map = texture(256, 256, (context, width, height) => {
-		const noise = random(89);
-		context.fillStyle = "#373b46";
-		context.fillRect(0, 0, width, height);
-		for (let i = 0; i < 4500; i++) {
-			context.fillStyle = i % 2 ? "#d1ddf01c" : "#12132133";
-			context.fillRect(noise() * width, noise() * height, 1 + noise() * 2, 1 + noise() * 3);
-		}
+		const wheelPaths = [0.18, 0.32, 0.68, 0.82];
+		const wear = Array.from({ length: width }, (_, x) => wheelPaths.reduce((sum, path) => {
+			const distance = (x / width - path) / 0.033;
+			return sum + 2.8 * Math.exp(-distance * distance);
+		}, 0));
+		aggregate(context, width, height, [55, 59, 70], 12, 89, wear);
 		context.fillStyle = "#d5e2e7";
 		context.fillRect(8, 0, 3, height);
 		context.fillRect(width - 11, 0, 3, height);
@@ -67,11 +84,31 @@ function road(course, group) {
 	map.wrapT = THREE.RepeatWrapping;
 	map.anisotropy = 4;
 	const asphalt = new THREE.MeshStandardMaterial({ map, roughness: 0.94 });
-	const gravel = new THREE.MeshStandardMaterial({ color: 0x66616b, roughness: 1 });
+	const gravelMap = texture(64, 128, (context, width, height) => {
+		aggregate(context, width, height, [102, 97, 107], 18, 27);
+		const noise = random(45);
+		for (let i = 0; i < 280; i++) {
+			const x = noise() * (width - 3), y = noise() * (height - 3);
+			const size = 0.8 + noise() * 1.6;
+			context.fillStyle = "#2f293d38";
+			context.fillRect(x + 0.55, y + 0.55, size, size * 0.7);
+			context.fillStyle = i % 3 ? "#bdb1bd44" : "#47405260";
+			context.beginPath();
+			context.moveTo(x, y + size * 0.36);
+			context.lineTo(x + size * 0.49, y);
+			context.lineTo(x + size, y + size * 0.4);
+			context.lineTo(x + size * 0.64, y + size * 0.77);
+			context.closePath();
+			context.fill();
+		}
+	});
+	gravelMap.wrapT = THREE.RepeatWrapping;
+	gravelMap.anisotropy = 4;
+	const gravel = new THREE.MeshStandardMaterial({ map: gravelMap, roughness: 1 });
 	group.add(
 		strip(course, -course.halfWidth, course.halfWidth, asphalt, 0.004, 14),
-		strip(course, -course.railOffset - 0.75, -course.halfWidth, gravel, 0, 14),
-		strip(course, course.halfWidth, course.railOffset + 0.75, gravel, 0, 14),
+		strip(course, -course.railOffset - 0.75, -course.halfWidth, gravel, 0, 3.5),
+		strip(course, course.halfWidth, course.railOffset + 0.75, gravel, 0, 3.5),
 	);
 }
 
@@ -128,26 +165,95 @@ function landscape(course, group) {
 	sky.renderOrder = -10;
 	group.add(sky);
 
-	// Offset ridge bands layer the skyline without drawing distant terrain at road detail.
+	// Keep the two distant silhouettes simple and give the near ridge a shaped slope.
 	const noise = random(34);
 	for (const [distance, rise, color, phase] of [[radius * 2.34, 246, 0x687993, 2.5], [radius * 1.7, 155, 0x50637e, 1.4], [radius, 84, 0x394e65, 0.2]]) {
-		const ridge = [], indices = [];
 		const steps = 72;
 		const heights = Array.from({ length: steps }, () => noise() * 0.24);
+		const profile = [];
 		for (let i = 0; i <= steps; i++) {
 			const angle = i * Math.PI * 2 / steps;
 			const ux = Math.cos(angle), uz = Math.sin(angle);
 			const x = cx + ux * distance, z = cz + uz * distance;
 			const height = rise * (0.75 + Math.sin(angle * 5 + phase) * 0.23 + Math.sin(angle * 9 - phase) * 0.16 + heights[i % steps]);
 			const footX = cx + ux * distance * 0.74, footZ = cz + uz * distance * 0.74;
-			ridge.push(footX, course.groundHeight(footX, footZ) - 3, footZ, x, Math.max(12, course.groundHeight(x, z)) + height, z);
-			if (i < steps) {
-				const a = i * 2;
-				indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-			}
+			profile.push({
+				foot: new THREE.Vector3(footX, course.groundHeight(footX, footZ) - 3, footZ),
+				crest: new THREE.Vector3(x, Math.max(12, course.groundHeight(x, z)) + height, z),
+			});
+		}
+		if (distance === radius) {
+			nearRidge(group, profile, color);
+			continue;
+		}
+		const ridge = [], indices = [];
+		for (const [i, { foot, crest }] of profile.entries()) {
+			ridge.push(foot.x, foot.y, foot.z, crest.x, crest.y, crest.z);
+			if (i === steps) break;
+			const a = i * 2;
+			indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
 		}
 		group.add(surface(ridge, indices, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, fog: false, toneMapped: false })));
 	}
+}
+
+function nearRidge(group, profile, color) {
+	const positions = [], indices = [], colors = [], uv = [], pines = [];
+	const ridge = new THREE.Color(color);
+	const haze = new THREE.Color(0x66768f);
+	const shade = new THREE.Color(), treeShade = new THREE.Color();
+	const foot = new THREE.Vector3(), crest = new THREE.Vector3(), point = new THREE.Vector3();
+	const treePoint = new THREE.Vector3(), edge = new THREE.Vector3();
+	const noise = random(191);
+	const subdivisions = 3;
+	const columns = (profile.length - 1) * subdivisions;
+	const rows = 12;
+	for (let col = 0; col <= columns; col++) {
+		const segment = Math.min(Math.floor(col / subdivisions), profile.length - 2);
+		const fraction = col / subdivisions - segment;
+		const a = profile[segment], b = profile[segment + 1];
+		foot.lerpVectors(a.foot, b.foot, fraction);
+		crest.lerpVectors(a.crest, b.crest, fraction);
+		const angle = col / columns * Math.PI * 2;
+		const forest = Math.sin(angle * 7 + 1) * 0.55 + Math.cos(angle * 13 - 1) * 0.45;
+		for (let row = 0; row <= rows; row++) {
+			const climb = row / rows;
+			const relief = Math.sin(Math.PI * climb);
+			const gully = Math.sin(24 * angle + climb * 2.7) + 0.4 * Math.cos(43 * angle - climb * 4);
+			point.lerpVectors(foot, crest, climb);
+			const strata = Math.sin(0.34 * point.y + 9 * angle);
+			point.x += Math.cos(angle) * gully * relief * 5;
+			point.z += Math.sin(angle) * gully * relief * 5;
+			point.y += gully * relief * 4;
+			const i = col * (rows + 1) + row;
+			positions.push(point.x, point.y, point.z);
+			uv.push(col / 6, climb * 3);
+			const mist = 0.24 * (1 - climb) ** 2;
+			const shading = 1.04 + relief * (gully * 0.2 + strata * 0.07 - forest * 0.07);
+			shade.copy(ridge).multiplyScalar(shading).lerp(haze, mist);
+			colors.push(shade.r, shade.g, shade.b);
+			if (col < columns && row < rows) {
+				indices.push(i, i + 1, i + rows + 1, i + 1, i + rows + 2, i + rows + 1);
+			}
+			if (col > 0 && row >= 2 && row <= 6 && forest > (row - 4) * 0.24 && noise() < 0.57) {
+				// Jitter within the preceding triangle so the pines stay on the slope.
+				const across = noise() * 0.75;
+				const down = noise() * (1 - across);
+				treePoint.copy(point);
+				treePoint.addScaledVector(edge.fromArray(positions, (i - rows - 1) * 3).sub(point), across);
+				treePoint.addScaledVector(edge.fromArray(positions, (i - 1) * 3).sub(point), down);
+				const height = 2.7 + noise() * 4.9;
+				treeShade.copy(shade).multiplyScalar(0.63 + noise() * 0.16);
+				pines.push({ x: treePoint.x, y: treePoint.y + height * 0.4, z: treePoint.z,
+					sx: height * 0.24, sy: height, sz: height * 0.24, yaw: noise() * Math.PI, color: treeShade.getHex() });
+			}
+		}
+	}
+	const map = texture(128, 128, (context, width, height) => aggregate(context, width, height, [250, 250, 250], 13, 125));
+	map.wrapS = map.wrapT = THREE.RepeatWrapping;
+	const material = new THREE.MeshBasicMaterial({ map, vertexColors: true, side: THREE.DoubleSide, fog: false, toneMapped: false });
+	group.add(surface(positions, indices, material, { colors, uv }));
+	instances(group, new THREE.ConeGeometry(1, 1, 5), new THREE.MeshBasicMaterial({ fog: false, toneMapped: false }), pines);
 }
 
 function instances(group, geometry, material, placements) {
@@ -221,7 +327,17 @@ function dressing(course, group) {
 	}
 	instances(group, new THREE.CylinderGeometry(1, 1.4, 1, 5), new THREE.MeshStandardMaterial({ color: 0x574b4d, roughness: 1 }), trunks);
 	instances(group, new THREE.ConeGeometry(1, 1, 6), new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), trees);
-	instances(group, new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), rocks);
+	const rockGeometry = new THREE.IcosahedronGeometry(1, 0);
+	const positions = rockGeometry.getAttribute("position");
+	const facets = random(28);
+	const colors = [];
+	for (let i = 0; i < positions.count; i += 3) {
+		const height = (positions.getY(i) + positions.getY(i + 1) + positions.getY(i + 2)) / 3;
+		const shade = 0.96 + facets() * 0.08 + height * 0.055;
+		for (let vertex = 0; vertex < 3; vertex++) colors.push(shade, shade, shade);
+	}
+	rockGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+	instances(group, rockGeometry, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true, vertexColors: true }), rocks);
 }
 
 function gates(course, group) {
