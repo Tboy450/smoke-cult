@@ -14,9 +14,12 @@ test('the switchbacks are an open descent with runway before and after the timed
   const first = samples[gates[0].index];
   const finish = samples[gates.at(-1).index];
   const drop = first.y - finish.y;
-  assert.ok(drop > 30 && drop < 50);
+  assert.ok(drop > 65 && drop < 85);
+  assert.ok(finish.s - first.s > 1200);
+  assert.equal(gates.length, 8);
   assert.ok(first.s - course.spawn.s > 10);
   assert.ok(course.length - finish.s >= 45);
+  assert.ok(course.baseSpawn.s > finish.s && course.baseSpawn.s < course.length - 20);
   assert.ok(gates.every((gate, i) => i === 0 || gate.index > gates[i - 1].index));
   for (const [i, p] of samples.entries()) {
     if (i === 0) continue;
@@ -62,7 +65,7 @@ test('the stock car can drive a clean timed descent through every gate using the
   const car = createCar(CAR, [x, y + 1, z], yaw);
   const run = createTougeRun(course);
   const events = [];
-  for (let step = 0; step < 240 * 80; step++) {
+  for (let step = 0; step < 240 * 110; step++) {
     const near = course.nearest(car.pos[0], car.pos[2]);
     assert.ok(near.distance < course.halfWidth, 'car remains on the pavement');
     const controls = aiControls(car, course, near.index, { pace: 6.2, topSpeed: 22 });
@@ -73,7 +76,17 @@ test('the stock car can drive a clean timed descent through every gate using the
     if (event) events.push(event.type);
     if (run.status === 'finished') break;
   }
-  assert.deepEqual(events, ['start', 'checkpoint', 'checkpoint', 'checkpoint', 'finish']);
-  assert.ok(run.time > 25 && run.time < 80, `finish time ${run.time}`);
+  assert.deepEqual(events, ['start', ...Array(6).fill('checkpoint'), 'finish']);
+  assert.ok(run.time > 55 && run.time < 110, `finish time ${run.time}`);
   assert.ok(car.grounded && carAxes(car).up[1] > 0.95);
+});
+
+test('the lift base spawn allows practice and the summit starts a fresh timed run', () => {
+  const { x, y, z, yaw } = course.baseSpawn;
+  const car = createCar(CAR, [x, y + 1, z], yaw);
+  const base = createTougeRun(course, course.baseSpawn);
+  assert.equal(base.status, 'practice');
+  assert.equal(stepTougeRun(base, course, car, 1 / 60, 500), null);
+  assert.equal(base.time, 0);
+  assert.equal(createTougeRun(course).status, 'ready');
 });

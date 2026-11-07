@@ -11,7 +11,7 @@ function shapeStick(x) {
 
 const MENU_KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
 
-export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onController = () => {}, onGarage = () => {}, onCombo = () => {}, onMenu = () => {}, isMenuOpen = () => false, isTouchBlocked = () => false }) {
+export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onController = () => {}, onGarage = () => {}, onCombo = () => {}, onLift = () => {}, onMenu = () => {}, isMenuOpen = () => false, isTouchBlocked = () => false }) {
 	const keys = new Set();
 	const touch = { gas: false, brake: false, handbrake: false, steer: 0 };
 	let device = typeof matchMedia === "function" && matchMedia(TOUCH_LAYOUT_QUERY).matches ? "touch" : "keyboard";
@@ -67,6 +67,7 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 		if (e.code === "KeyM") onMute();
 		if (e.code === "KeyG") onGarage();
 		if (e.code === "KeyH") onCombo();
+		if (e.code === "KeyL") onLift();
 		if (e.code === "Space") e.preventDefault();
 	});
 	addEventListener("keyup", (e) => keys.delete(e.code));
@@ -165,6 +166,7 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 				} else {
 					if (pressedNow(12)) onPreset(); // D-pad up
 					if (pressedNow(13)) onReset(); // D-pad down
+					if (pressedNow(1)) onLift(); // B / Circle
 					if (pressedNow(3)) onCamera(); // Y
 					if (pressedNow(9)) onGarage(); // Menu
 				}

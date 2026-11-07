@@ -138,11 +138,11 @@ export function buildTougeCourse() {
 		heading = nextHeading;
 	}
 	const gate = (label) => gates.push({ index: samples.length - 1, label });
+	const spawnAt = ({ x, y, z, s, tx, tz }) => ({ x, y, z, s, yaw: Math.atan2(-tx, -tz) });
 	append(START_X, START_Z, 0, heading);
 	straight(8);
-	const spawnPoint = samples.at(-1);
-	const spawn = { x: spawnPoint.x, y: spawnPoint.y, z: spawnPoint.z, s: spawnPoint.s,
-		yaw: Math.atan2(-spawnPoint.tx, -spawnPoint.tz) };
+	const summit = samples.at(-1);
+	const spawn = spawnAt(summit);
 	straight(16);
 	gate("Start");
 	straight(96);
@@ -154,9 +154,26 @@ export function buildTougeCourse() {
 	straight(116);
 	hairpin(29, Math.PI - DIAGONAL);
 	gate("Checkpoint 3");
-	straight(75);
+	straight(128);
+	hairpin(25, DIAGONAL);
+	gate("Checkpoint 4");
+	straight(144);
+	hairpin(28, Math.PI - DIAGONAL);
+	gate("Checkpoint 5");
+	straight(118);
+	hairpin(26, DIAGONAL);
+	gate("Checkpoint 6");
+	straight(93);
 	gate("Finish");
-	straight(50);
+	straight(30);
+	const base = samples.at(-1);
+	const baseSpawn = spawnAt(base);
+	straight(30);
+	const station = (point, offset) => {
+		const x = point.x + point.rx * offset, z = point.z + point.rz * offset;
+		return { x, z, y: groundHeight(x, z) };
+	};
+	const lift = { base: station(base, 15), summit: station(summit, -15) };
 
 	const walls = buildRails(samples);
 	const blocks = [];
@@ -175,5 +192,5 @@ export function buildTougeCourse() {
 		},
 	};
 	return { samples, count: samples.length, length: samples.at(-1).s, halfWidth: HALF_WIDTH,
-		railOffset: RAIL_OFFSET, spawn, gates, walls, blocks, groundHeight, nearest, world };
+		railOffset: RAIL_OFFSET, spawn, baseSpawn, lift, gates, walls, blocks, groundHeight, nearest, world };
 }

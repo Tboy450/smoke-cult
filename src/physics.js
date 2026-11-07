@@ -81,6 +81,8 @@ export function createCar(tuning, position = [0, 1, 0], yaw = 0, wheels = WHEELS
 		steerAngle: 0,
 		speed: 0,
 		forwardSpeed: 0,
+		drive: 0,
+		burnout: false,
 		driftAngle: 0, // degrees, signed: + = sliding with the tail out to the left
 		grounded: false,
 		preset: DEFAULT_PRESET,
@@ -94,6 +96,7 @@ function makeWheels(tuning, defs) {
 		def,
 		lastCompression: 0,
 		spin: 0,
+		wheelspin: 0,
 		slip: 0,
 		grounded: false,
 		drop: tuning.SpringLength * (1 - tuning.StaticSag),
@@ -133,13 +136,11 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 
 	// Steering: player input, eased, with less lock at speed unless drifting, plus counter-steer assist.
 	const lock = rad(c.MaxSteerDeg);
-	let playerLock = lock;
-	if (Math.abs(beta) < rad(10)) {
-		const speedFactor = clamp(speed / c.TopSpeed, 0, 1);
-		playerLock = lock * (1 + (c.HighSpeedSteerScale - 1) * speedFactor);
-	}
+	const speedFactor = clamp(speed / c.TopSpeed, 0, 1);
+	const slideSteer = clamp((Math.abs(beta) - rad(6)) / rad(12), 0, 1);
+	const playerLock = lock * (1 - (1 - c.HighSpeedSteerScale) * speedFactor * (1 - slideSteer));
 	car.steer += (controls.steer - car.steer) * Math.min(1, c.SteerSpeed * dt);
-	const assist = car.grounded && forwardSpeed > 3 ? preset.Assist * beta : 0;
+	const assist = car.grounded ? preset.Assist * beta * clamp((forwardSpeed - 2) / 1.5, 0, 1) : 0;
 	car.steerAngle = clamp(car.steer * playerLock + assist, -lock, lock);
 
 	let force = [0, -mass * GRAVITY, 0];
@@ -154,7 +155,17 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 	const rayLength = springLength + radius;
 	const stiffness = (cornerMass * GRAVITY) / (c.StaticSag * springLength);
 	const damping = c.Damping * 2 * Math.sqrt(stiffness * cornerMass);
-	const reversing = controls.brake > 0 && forwardSpeed < 0.5;
+	const powerBrake = controls.throttle > 0.25 && controls.brake > 0.25 ? clamp((5 - speed) / 2, 0, 1) : 0;
+	const rollingBack = forwardSpeed < -0.5 && -forwardSpeed > Math.abs(localVel[0]);
+	const reversing = controls.throttle <= 0.02 && controls.brake > 0 && forwardSpeed < 0.5 &&
+		(speed < 1.5 || rollingBack || car.drive < 0);
+	const drive = reversing ? -controls.brake : controls.throttle * (1 - controls.brake * (1 - powerBrake));
+	const poweredHandbrake = controls.handbrake && Math.abs(drive) > 0.25 ? clamp((8 - speed) / 4, 0, 1) : 0;
+	const burnout = Math.max(powerBrake, poweredHandbrake);
+	const gearSpeed = Math.max(0, Math.sign(drive) * forwardSpeed);
+	const gearLimit = reversing ? c.ReverseSpeed : c.TopSpeed;
+	const room = clamp(1 - (gearSpeed / gearLimit) ** 1.25, 0, 1);
+	const driveForce = drive * mass * c.EngineAccel * (reversing ? 0.76 : 1.06) * room / 2;
 	const coasting = controls.throttle === 0 && controls.brake === 0;
 	let groundedWheels = 0;
 
@@ -166,6 +177,7 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 		wheel.contact = hit ? hit.position : null;
 		if (!hit) {
 			wheel.lastCompression = 0;
+			wheel.wheelspin = 0;
 			wheel.slip = 0;
 			wheel.drop = springLength;
 			continue;
@@ -195,24 +207,20 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 		let fLong = -vLong * cornerMass * (0.02 + rough * 0.6);
 		if (coasting && !def.front) fLong -= sign(vLong) * Math.min(cornerMass * 1.2, stopLong); // engine braking
 		if (!def.front) {
-			if (reversing) {
-				const room = clamp(1 - Math.abs(forwardSpeed) / c.ReverseSpeed, 0, 1);
-				fLong -= (controls.brake * mass * c.EngineAccel * 0.6 * room) / 2;
-			} else {
-				const room = clamp(1 - forwardSpeed / c.TopSpeed, 0, 1);
-				fLong += (controls.throttle * mass * c.EngineAccel * room) / 2;
-			}
-			if (controls.handbrake) fLong -= sign(vLong) * Math.min(cornerMass * c.BrakeAccel * 0.8, stopLong);
+			fLong += driveForce;
+			if (controls.handbrake) fLong -= sign(vLong) * Math.min(cornerMass * c.BrakeAccel * 0.8 * (1 - poweredHandbrake), stopLong);
 		}
 		if (controls.brake > 0 && !reversing) {
 			// Brakes bite less on loose ground, even when there's grip to spare for cornering.
-			fLong -= sign(vLong) * Math.min(controls.brake * cornerMass * c.BrakeAccel * (1 - rough * 2), stopLong);
+			const pedal = controls.brake * (def.front ? 1 : 1 - powerBrake);
+			fLong -= sign(vLong) * Math.min(pedal * cornerMass * c.BrakeAccel * (1 - rough * 2), stopLong);
 		}
 		if (coasting && Math.abs(vLong) < 0.5) fLong -= sign(vLong) * stopLong; // parked cars stay parked
 
 		// Friction circle: grip spent on power/braking is gone from cornering (but never all of it).
 		let grip = (def.front ? c.FrontGrip : c.RearGrip) * (1 - rough);
 		if (controls.handbrake && !def.front) grip *= c.HandbrakeGrip;
+		if (!def.front) grip *= 1 - 0.45 * powerBrake;
 		const maxForce = grip * load;
 		fLong = clamp(fLong, -maxForce, maxForce);
 		const used = maxForce > 0 ? fLong / maxForce : 0;
@@ -226,9 +234,13 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 		addForceAt(scale(up, load), mount);
 		addForceAt(add(scale(forward, fLong), scale(side, fLat)), lerp(hit.position, mount, c.ForceHeight));
 
-		wheel.spin += (vLong / radius) * dt;
-		wheel.slip = Math.abs(vLat);
-		if (!def.front && Math.abs(used) > 0.95 && controls.throttle > 0) wheel.slip = Math.max(wheel.slip, 5); // wheelspin
+		if (!def.front) {
+			const excess = Math.max(0, (Math.abs(driveForce) - maxForce) / (cornerMass * 1.6));
+			const target = load > 0 ? Math.sign(drive) * Math.min(22, excess + 10 * burnout * Math.abs(drive)) : 0;
+			wheel.wheelspin += (target - wheel.wheelspin) * Math.min(1, (drive ? 12 : 18) * dt);
+		}
+		wheel.spin += ((vLong + wheel.wheelspin) / radius) * dt;
+		wheel.slip = Math.hypot(vLat, wheel.wheelspin);
 	}
 
 	car.grounded = groundedWheels >= 2;
@@ -261,7 +273,7 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 
 	// Spin guard: past the preset's angle, slow down rotation that would spin the car out.
 	const yaw = dot(car.angVel, up);
-	if (car.grounded && preset.SpinGuard > 0 && Math.abs(beta) > rad(preset.SpinGuardDeg) && beta * yaw > 0) {
+	if (car.grounded && forwardSpeed > 0 && preset.SpinGuard > 0 && Math.abs(beta) > rad(preset.SpinGuardDeg) && beta * yaw > 0) {
 		car.angVel = sub(car.angVel, scale(up, yaw * Math.min(1, preset.SpinGuard * dt)));
 	}
 
@@ -272,6 +284,8 @@ export function stepCar(car, controls, c, dt, world = flatWorld) {
 
 	car.speed = speed;
 	car.forwardSpeed = forwardSpeed;
+	car.drive = drive;
+	car.burnout = burnout > 0.25 && car.grounded;
 	car.driftAngle = speed > 4 && forwardSpeed > 0 ? deg(beta) : 0;
 	car.lateral = carRight; // for visuals
 }
@@ -284,7 +298,13 @@ export function placeCar(car, x, z, yaw) {
 	car.quat = qFromYaw(yaw);
 	car.steer = 0;
 	car.steerAngle = 0;
-	for (const wheel of car.wheels) wheel.lastCompression = 0;
+	car.speed = car.forwardSpeed = car.driftAngle = car.drive = 0;
+	car.grounded = car.burnout = false;
+	for (const wheel of car.wheels) {
+		wheel.lastCompression = wheel.wheelspin = wheel.slip = 0;
+		wheel.contact = null;
+		wheel.grounded = false;
+	}
 }
 
 // Put the car back on its wheels, facing the way it was roughly pointing.

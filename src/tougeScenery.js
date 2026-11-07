@@ -325,8 +325,14 @@ function dressing(course, group) {
 			trees.push({ x, y: y + size * 0.76, z, sx: size * 0.17, sy: size * 0.51, sz: size * 0.17, yaw, color });
 		}
 	}
-	instances(group, new THREE.CylinderGeometry(1, 1.4, 1, 5), new THREE.MeshStandardMaterial({ color: 0x574b4d, roughness: 1 }), trunks);
-	instances(group, new THREE.ConeGeometry(1, 1, 6), new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), trees);
+	const { base, summit } = course.lift;
+	const dx = summit.x - base.x, dz = summit.z - base.z;
+	const clearsLift = ({ x, z }) => {
+		const t = THREE.MathUtils.clamp(((x - base.x) * dx + (z - base.z) * dz) / (dx * dx + dz * dz), 0, 1);
+		return Math.hypot(x - base.x - dx * t, z - base.z - dz * t) > (t < 0.12 || t > 0.88 ? 13 : 7);
+	};
+	instances(group, new THREE.CylinderGeometry(1, 1.4, 1, 5), new THREE.MeshStandardMaterial({ color: 0x574b4d, roughness: 1 }), trunks.filter(clearsLift));
+	instances(group, new THREE.ConeGeometry(1, 1, 6), new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), trees.filter(clearsLift));
 	const rockGeometry = new THREE.IcosahedronGeometry(1, 0);
 	const positions = rockGeometry.getAttribute("position");
 	const facets = random(28);
@@ -337,7 +343,7 @@ function dressing(course, group) {
 		for (let vertex = 0; vertex < 3; vertex++) colors.push(shade, shade, shade);
 	}
 	rockGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-	instances(group, rockGeometry, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true, vertexColors: true }), rocks);
+	instances(group, rockGeometry, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true, vertexColors: true }), rocks.filter(clearsLift));
 }
 
 function gates(course, group) {
@@ -415,4 +421,94 @@ export function buildTougeScenery(course) {
 	dressing(course, group);
 	gates(course, group);
 	return group;
+}
+
+export function buildTougeLift(course, group) {
+	const { base, summit } = course.lift;
+	const from = new THREE.Vector3(base.x, base.y + 10, base.z);
+	const to = new THREE.Vector3(summit.x, summit.y + 10, summit.z);
+	const steel = new THREE.MeshStandardMaterial({ color: 0x344356, roughness: 0.78 });
+	const deck = new THREE.MeshStandardMaterial({ color: 0x596475, roughness: 0.88 });
+	const glow = new THREE.MeshBasicMaterial({ color: 0x71e0e4, toneMapped: false });
+	const yaw = course.baseSpawn.yaw;
+	function box(parent, material, size, position) {
+		const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+		mesh.position.set(...position);
+		parent.add(mesh);
+		return mesh;
+	}
+	for (const [label, station] of [["LIFT BASE", base], ["SUMMIT LIFT", summit]]) {
+		const terminal = new THREE.Group();
+		terminal.position.set(station.x, station.y, station.z);
+		terminal.rotation.y = yaw;
+		box(terminal, deck, [8, 1, 10], [0, 0.65, 0]);
+		for (const x of [-3.1, 3.1]) {
+			box(terminal, steel, [0.48, 10.5, 0.6], [x, 4.95, 0]);
+			box(terminal, glow, [0.09, 3, 0.64], [x, 3, 0]);
+		}
+		box(terminal, steel, [7, 0.46, 1.1], [0, 10.1, 0]);
+		const sign = texture(256, 64, (context, width, height) => {
+			context.fillStyle = "#17273a";
+			context.fillRect(0, 0, width, height);
+			context.fillStyle = "#71e0e4";
+			context.font = "bold 34px sans-serif";
+			context.textAlign = "center";
+			context.fillText(label, width / 2, 43);
+		});
+		const face = new THREE.PlaneGeometry(5.6, 1.4);
+		const signMaterial = new THREE.MeshBasicMaterial({ map: sign, toneMapped: false });
+		for (const side of [-1, 1]) {
+			const panel = new THREE.Mesh(face, signMaterial);
+			panel.position.set(0, 7.9, side * 0.06);
+			panel.rotation.y = side < 0 ? Math.PI : 0;
+			terminal.add(panel);
+		}
+		group.add(terminal);
+	}
+	const cablePoint = (t) => {
+		const point = new THREE.Vector3().lerpVectors(from, to, t);
+		const rise = Math.min(1, t / 0.12, (1 - t) / 0.12);
+		const sag = t > 0.12 && t < 0.88 ? Math.sin(Math.PI * (t - 0.12) / 0.76) * 3 : 0;
+		point.y += rise * 12 - sag;
+		return point;
+	};
+	const anchors = [0, 0.12, 0.88, 1];
+	for (const [i, start] of anchors.slice(0, -1).entries()) {
+		const end = anchors[i + 1];
+		const cable = new THREE.CatmullRomCurve3(Array.from({ length: 9 }, (_, j) => cablePoint(start + (end - start) * j / 8)));
+		group.add(new THREE.Mesh(new THREE.TubeGeometry(cable, 24, 0.062, 5, false), steel));
+	}
+	for (const t of anchors.slice(1, -1)) {
+		const { x, y, z } = cablePoint(t);
+		const tower = new THREE.Group();
+		tower.position.set(x, y, z);
+		tower.rotation.y = Math.atan2(to.x - from.x, to.z - from.z);
+		for (const side of [-4.6, 4.6]) box(tower, steel, [0.62, 23.5, 0.68], [side, -11.75, 0]);
+		box(tower, steel, [10, 0.42, 1], [0, 0.28, 0]);
+		box(tower, glow, [0.35, 0.22, 0.4], [0, 0.64, 0]);
+		group.add(tower);
+	}
+	const cabin = new THREE.Group();
+	cabin.rotation.y = yaw;
+	box(cabin, deck, [4.5, 0.35, 6.5], [0, 0, 0]);
+	for (const x of [-2.1, 2.1]) {
+		box(cabin, steel, [0.14, 0.75, 6.35], [x, 0.55, 0]);
+		box(cabin, glow, [0.12, 0.12, 6.25], [x, 0.98, 0]);
+	}
+	// Keep the hoist out of the car's space and connect it to the cable above the platform.
+	const hoist = box(cabin, steel, [0.16, 8.6, 0.16], [0, 4.45, 3]);
+	const arm = box(cabin, steel, [0.22, 0.25, 3.2], [0, 8.75, 1.5]);
+	group.add(cabin);
+	const move = (t) => {
+		const point = cablePoint(t);
+		const drop = 8.6 - 3.4 * Math.sin(Math.PI * t);
+		cabin.position.copy(point);
+		cabin.position.y -= drop;
+		hoist.scale.y = drop / 8.6;
+		hoist.position.y = drop / 2;
+		arm.position.y = drop;
+		return cabin.position;
+	};
+	move(0);
+	return { move };
 }

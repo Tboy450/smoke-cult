@@ -93,3 +93,18 @@ test('bad or missing saved data falls back safely', () => {
   assert.equal(picked(createGarageState(null, true), 'graphics').id, 'low', 'phones start on low graphics');
   assert.equal(picked(createGarageState({ graphics: 'high' }, true), 'graphics').id, 'high', 'a saved choice wins');
 });
+
+test('legacy destinations migrate and each map remembers its own spawn', () => {
+  const yard = createGarageState({ place: 'pad' });
+  assert.equal(picked(yard, 'map').id, 'yard');
+  assert.equal(picked(yard, 'place').id, 'pad');
+  const mountain = createGarageState({ place: 'touge' });
+  assert.equal(picked(mountain, 'map').id, 'touge');
+  assert.equal(picked(mountain, 'mountainSpawn').id, 'summit');
+  stepOption(yard, 'map', 1);
+  stepOption(yard, 'mountainSpawn', 1);
+  stepOption(yard, 'map', 1);
+  const reloaded = createGarageState(saveData(yard));
+  assert.equal(picked(reloaded, 'place').id, 'pad');
+  assert.equal(picked(reloaded, 'mountainSpawn').id, 'base');
+});

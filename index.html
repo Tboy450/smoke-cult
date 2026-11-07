@@ -12,8 +12,8 @@
 			}
 			* { box-sizing: border-box; }
 			html, body { margin: 0; height: 100%; overflow: hidden; background: #12081a; color: var(--ink);
-				font-family: "Segoe UI", system-ui, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
-			#app canvas { display: block; }
+				font-family: "Segoe UI", system-ui, sans-serif; user-select: none; -webkit-user-select: none; }
+			#app canvas { display: block; touch-action: none; }
 			.hud { position: fixed; pointer-events: none; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); }
 			#title { top: 14px; left: 16px; font-weight: 900; letter-spacing: 0.12em; font-size: 14px; opacity: 0.85; }
 			#title b { color: var(--pink); }
@@ -57,9 +57,9 @@
 			.touch-ui { display: none; }
 			body.touch .touch-ui { display: block; }
 			body.touch #hint { font-size: 11px; }
-			#touch-steer { position: fixed; left: 0; top: 30%; bottom: 0; width: 45%; }
+			#touch-steer { position: fixed; left: 0; top: 30%; bottom: 0; width: 45%; touch-action: none; }
 			.tbtn { position: fixed; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.5); color: #fff; font-weight: 900;
-				display: flex; align-items: center; justify-content: center; font-size: 15px; background: rgba(0, 0, 0, 0.35); }
+				display: flex; align-items: center; justify-content: center; font-size: 15px; background: rgba(0, 0, 0, 0.35); touch-action: none; }
 			#touch-gas { right: 18px; bottom: 26px; width: 110px; height: 110px; background: rgba(30, 200, 90, 0.45); }
 			#touch-brake { right: 140px; bottom: 26px; width: 84px; height: 84px; background: rgba(220, 50, 50, 0.45); }
 			#touch-hb { right: 30px; bottom: 150px; width: 84px; height: 84px; background: rgba(255, 42, 160, 0.5); }
@@ -82,9 +82,21 @@
 			#wrong-way { display: none; top: 30%; left: 50%; transform: translateX(-50%); padding: 6px 18px; border-radius: 6px;
 				background: #d81830; font-size: 22px; font-weight: 900; letter-spacing: 0.1em; }
 			body.touch #minimap { top: 150px; right: 10px; width: 100px; height: 100px; }
+			#return-tools { position: fixed; z-index: 3; left: 16px; bottom: 54px; gap: 5px; }
+			#return-tools:not([hidden]) { display: flex; }
+			#return-tools button { min-height: 40px; padding: 0 10px; border: 1px solid #71e0e4; border-radius: 6px;
+				background: rgba(12, 20, 34, 0.9); color: #e4ffff; font: 800 11px "Segoe UI", system-ui, sans-serif;
+				letter-spacing: 0.06em; cursor: pointer; touch-action: manipulation; }
+			#lift-return:not([hidden]) { background: #14434d; }
+			#lift-return:disabled { opacity: 0.68; cursor: default; }
+			body.garage #return-tools { display: none; }
 
 			#garage { display: none; position: fixed; z-index: 5; top: 0; bottom: 0; left: 0; width: min(410px, 100vw); padding: 16px 18px 14px;
-				flex-direction: column; gap: 7px; overflow-y: auto; touch-action: pan-y; background: linear-gradient(90deg, rgba(10, 4, 16, 0.94) 72%, rgba(10, 4, 16, 0)); }
+				flex-direction: column; gap: 7px; background: linear-gradient(90deg, rgba(10, 4, 16, 0.94) 72%, rgba(10, 4, 16, 0)); }
+			#garage-scroll { display: flex; flex-direction: column; gap: inherit; min-height: 0; overflow-y: auto;
+				overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; }
+			#garage-scroll > * { flex-shrink: 0; }
+			#garage-scroll, #picker, #tune { scrollbar-width: thin; scrollbar-color: #74537d #1a0e25; }
 			body.garage #garage { display: flex; }
 			body.garage .hud, body.garage .touch-ui, body.garage #touch-garage, body.garage #sound-btn { display: none !important; }
 			#garage-brand { display: flex; justify-content: space-between; font-weight: 900; letter-spacing: 0.14em; font-size: 13px; }
@@ -107,8 +119,10 @@
 				font: 800 12px "Segoe UI", system-ui, sans-serif; }
 			.gbuy.can { border-color: #ffd23f; color: #ffd23f; }
 			#garage-note { margin: 0; min-height: 15px; font-size: 12px; color: #ffd23f; }
-			#picker { display: none; position: absolute; inset: 0; z-index: 2; padding: 12px; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+			#picker { display: none; position: absolute; inset: 0; z-index: 2; padding: 12px; flex-direction: column; align-items: center; justify-content: safe center; gap: 8px;
+				overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
 				background: rgba(10, 4, 16, 0.96); }
+			#picker > * { flex-shrink: 0; }
 			#picker.open { display: flex; }
 			#picker-title { font-size: 13px; letter-spacing: 0.12em; }
 			#picker-wheel { width: min(240px, 62vw, 46vh); height: auto; aspect-ratio: 1; touch-action: none; cursor: crosshair; }
@@ -132,27 +146,28 @@
 			.garrow { height: 34px; border: 0; background: none; color: #fff; font-size: 24px; line-height: 1; cursor: pointer; }
 			.gvalue { display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 13px; text-align: center; }
 			.gswatch { width: 13px; height: 13px; flex: none; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.5); }
-			#garage-drive { position: sticky; bottom: 0; flex: none; margin-top: 4px; min-height: 48px; border: 0; border-radius: 6px; background: var(--pink); color: #fff; cursor: pointer;
+			#garage-drive { flex: none; margin-top: 4px; min-height: 48px; border: 0; border-radius: 6px; background: var(--pink); color: #fff; cursor: pointer;
 				font: 900 15px "Segoe UI", system-ui, sans-serif; letter-spacing: 0.08em; }
 			#garage-help { margin: 0; font-size: 11px; line-height: 1.4; color: #a78fb0; }
 			body.touch #garage-help { display: none; }
 			@media (orientation: portrait) {
-				#garage { top: auto; width: 100vw; height: 62vh; padding: 12px 14px; background: linear-gradient(0deg, rgba(10, 4, 16, 0.96) 90%, rgba(10, 4, 16, 0)); }
+				#garage { top: auto; width: 100vw; height: 62dvh; padding: 12px 14px; background: linear-gradient(0deg, rgba(10, 4, 16, 0.96) 90%, rgba(10, 4, 16, 0)); }
 				#garage-name { font-size: 25px; }
 				#garage-stats { grid-template-columns: 1fr 1fr; gap: 3px 12px; }
 				.gstat { grid-template-columns: 62px 1fr; font-size: 8px; }
 				.grow { min-height: 36px; }
 			}
 			@media (max-height: 500px) and (orientation: landscape) {
-				#garage { width: min(350px, 50vw); padding: 10px 12px; gap: 5px; }
+				#garage { width: min(368px, 56vw); padding: 10px 12px; gap: 5px; }
 				#garage-name { font-size: 22px; }
 				#garage-tag { font-size: 11px; }
 				#garage-stats { display: none; }
 				.grow { min-height: 33px; grid-template-columns: 76px 32px 1fr 32px; }
+				.grow.hascolor { grid-template-columns: 76px 30px minmax(0, 1fr) 30px 32px; }
 				.gvalue { font-size: 12px; }
 				#garage-drive { min-height: 40px; }
 			}
-			#tune { z-index: 10; width: min(360px, calc(100vw - 24px)); touch-action: pan-y; }
+			#tune { z-index: 10; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 56px); touch-action: pan-y; overscroll-behavior: contain; }
 			#tune input { touch-action: auto; }
 			#tune-close { float: right; }
 			#score-box { top: 85px; left: 16px; width: 260px; padding: 12px 14px; border-left: 3px solid #74537d;
@@ -199,6 +214,23 @@
 				#touch-brake { width: 66px; height: 66px; right: 105px; bottom: 14px; }
 				#touch-hb { width: 66px; height: 66px; right: 18px; bottom: 106px; }
 			}
+			@media (max-height: 500px) and (orientation: landscape) {
+				body.touch #hint { display: none; }
+				body.touch #title { top: 9px; left: 12px; font-size: 12px; }
+				body.touch #flash { top: 44%; left: calc(min(215px, 37vw) + 20px); right: 82px; width: auto;
+					transform: translateY(-50%); font-size: clamp(14px, 2.5vw, 22px); }
+				body.touch #score-box { top: 34px; left: 12px; width: min(215px, 37vw); }
+				body.touch #score-box.small { width: min(165px, 34vw); }
+				body.touch #minimap { top: 75px; left: auto; right: 12px; width: 68px; height: 68px; }
+				body.touch .tsmall, body.touch #touch-garage { top: 31px; width: 42px; height: 42px; font-size: 8px; }
+				body.touch #touch-garage { right: 8px; }
+				#touch-preset { right: 56px; }
+				#touch-reset { right: 104px; }
+				#touch-cam { right: 152px; }
+				#touch-tune { right: 200px; }
+				#return-tools { left: 12px; bottom: 24px; }
+				#return-tools button { min-height: 38px; }
+			}
 		</style>
 		<script type="importmap">
 			{
@@ -238,17 +270,23 @@
 
 		<button id="touch-garage">GARAGE</button>
 		<button id="sound-btn" aria-label="Turn sound on or off">SOUND ON</button>
+		<div id="return-tools" role="group" aria-label="Return to summit" hidden>
+			<button id="summit-return" type="button" aria-label="Teleport to summit" title="Teleport to summit · R or D-pad down">↑ SUMMIT</button>
+			<button id="lift-return" type="button" title="Ride the lift · L or B" hidden>RIDE LIFT</button>
+		</div>
 
 		<section id="garage" aria-label="Garage">
-			<div id="garage-brand"><span>THE <b>SMOKEHOUSE</b></span><span id="garage-bankbox">BANK <b id="garage-bank">0</b></span></div>
-			<h1 id="garage-name"></h1>
-			<p id="garage-tag"></p>
-			<div id="garage-stats"></div>
-			<div id="garage-tabs"></div>
-			<div id="garage-rows"></div>
-			<p id="garage-note"></p>
+			<div id="garage-scroll">
+				<div id="garage-brand"><span>THE <b>SMOKEHOUSE</b></span><span id="garage-bankbox">BANK <b id="garage-bank">0</b></span></div>
+				<h1 id="garage-name"></h1>
+				<p id="garage-tag"></p>
+				<div id="garage-stats"></div>
+				<div id="garage-tabs"></div>
+				<div id="garage-rows"></div>
+				<p id="garage-note"></p>
+				<p id="garage-help">Controller: D-pad to choose, LB/RB for tabs, A to buy, pick a color or drive, Menu to leave. Keyboard: arrows, Q/E for tabs, Enter to buy, pick a color or drive.</p>
+			</div>
 			<button id="garage-drive" tabindex="-1"></button>
-			<p id="garage-help">Controller: D-pad to choose, LB/RB for tabs, A to buy, pick a color or drive, Menu to leave. Keyboard: arrows, Q/E for tabs, Enter to buy, pick a color or drive.</p>
 			<div id="picker">
 				<b id="picker-title"></b>
 				<canvas id="picker-wheel" width="240" height="240" aria-label="Color wheel"></canvas>

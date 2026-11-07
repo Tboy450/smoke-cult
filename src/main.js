@@ -13,7 +13,7 @@ import { awardBonus, createScore, stepScore, finishScore, SCORE_RULES } from "./
 import { createSound } from "./sound.js";
 import { buildTougeCourse } from "./tougeCourse.js";
 import { createTougeRun, stepTougeRun } from "./tougeRun.js";
-import { buildTougeScenery } from "./tougeScenery.js";
+import { buildTougeLift, buildTougeScenery } from "./tougeScenery.js";
 import { buildTrack, collideCar, createLap, createTrackWorld, GARAGE, inGarageBay, nearestSample, resetLap, stepLap, zoneAt } from "./track.js";
 import { CAR, PRESET_ORDER } from "./tuning.js";
 import { createTuningPanel } from "./tuningPanel.js";
@@ -28,7 +28,8 @@ const CLIP_ANGLE = 20;
 const SAVE_KEY = "smoke-cult-garage";
 const PROGRESS_KEY = "smoke-cult-progress";
 const RECORDS_KEY = "smoke-cult-records-v1";
-const TOUGE_RECORDS_KEY = "smoke-cult-cinder-pass-records-v1";
+const TOUGE_RECORDS_KEY = "smoke-cult-cinder-pass-records-v2";
+const LIFT_SECONDS = 12;
 const BAY_SPEED = 7; // m/s: slow to this in the Smokehouse bay and the garage opens
 const tuning = { ...CAR };
 
@@ -60,6 +61,8 @@ let world = yardWorld;
 let onTouge = false;
 let tougeScenery;
 let tougeRun;
+let liftRig;
+let liftTravel = null;
 
 const coneGeo = new THREE.ConeGeometry(0.22, 0.7, 16).translate(0, 0.35, 0);
 const coneMat = new THREE.MeshStandardMaterial({ color: 0xff6a10, roughness: 0.6 });
@@ -124,7 +127,7 @@ const saveProgress = () => save(PROGRESS_KEY, progress);
 const garage = createGarageState(loadSaved(SAVE_KEY), touchLayout.matches);
 const progress = createProgress(loadSaved(PROGRESS_KEY));
 let records = readRecords(loadSaved(RECORDS_KEY));
-let tougeRecords = readRecords(loadSaved(TOUGE_RECORDS_KEY));
+let tougeRecords = readRecords(loadSaved(TOUGE_RECORDS_KEY) ?? { combo: loadSaved("smoke-cult-cinder-pass-records-v1")?.combo });
 function applyRecords() {
 	score.best = onTouge ? tougeRecords.combo : records.combo;
 	lap.best = records.lapTime;
@@ -182,8 +185,11 @@ function payBanked() {
 function setRoute(mountain) {
 	if (mountain && !tougeScenery) {
 		tougeScenery = buildTougeScenery(course);
+		liftRig = buildTougeLift(course, tougeScenery);
 		scene.add(tougeScenery);
 	}
+	liftTravel = null;
+	if (mountain) liftRig.move(0);
 	onTouge = mountain;
 	world = mountain ? course.world : yardWorld;
 	yard.group.visible = !mountain;
@@ -193,6 +199,8 @@ function setRoute(mountain) {
 	scene.fog.far = mountain ? 560 : 680;
 	$("route-name").textContent = mountain ? "Cinder Pass" : "Rustline Yard";
 	$("route-progress").hidden = !mountain;
+	$("return-tools").hidden = !mountain;
+	$("lift-return").hidden = true;
 	$("wrong-way").style.display = "none";
 	flashTimer = 0;
 	$("flash").textContent = "";
@@ -202,15 +210,45 @@ function setRoute(mountain) {
 	rebuildMinimap();
 }
 
-function restartTouge() {
-	const spot = course.spawn;
+function restartTouge(spot = course.spawn, message = "CROSS START TO BEGIN") {
+	if (liftTravel !== null) liftRig.move(0);
+	liftTravel = null;
 	placeCar(car, spot.x, spot.z, spot.yaw);
 	car.pos[1] = spot.y + 1;
-	tougeRun = createTougeRun(course);
+	tougeRun = createTougeRun(course, spot);
 	$("route-progress").value = 0;
 	effects.clear();
 	resetChaseView(spot, spot.y);
-	flash("CROSS START TO BEGIN");
+	flash(message);
+}
+
+function atLiftBase() {
+	const { x, z } = course.baseSpawn;
+	return onTouge && mode === "drive" && liftTravel === null && Math.hypot(car.pos[0] - x, car.pos[2] - z) < 22;
+}
+
+function boardLift() {
+	if (!atLiftBase() || car.speed >= 8) return;
+	finishScore(score, "Boarded the lift");
+	const position = liftRig.move(0);
+	placeCar(car, position.x, position.z, course.baseSpawn.yaw);
+	car.pos[1] = position.y + 0.8;
+	liftTravel = 0;
+	$("lift-return").hidden = true;
+	$("route-progress").value = 0;
+	$("lap-line").textContent = "Riding the lift to the summit";
+	$("angle").textContent = "";
+	$("angle-bar").style.width = "0";
+	$("speed").textContent = "0";
+	$("unit").textContent = "SUMMIT LIFT";
+	effects.clear();
+	flash("SUMMIT LIFT");
+}
+
+function teleportSummit() {
+	if (!onTouge || mode !== "drive") return;
+	finishScore(score, "Returned to summit");
+	restartTouge(course.spawn, "SUMMIT · CROSS START TO BEGIN");
 }
 
 function openGarage() {
@@ -237,13 +275,14 @@ function leaveGarage() {
 	document.body.classList.remove("garage");
 	yard.garage.setLit(false);
 	saveGarage();
-	const destination = picked(garage, "place").id;
-	setRoute(destination === "touge");
+	setRoute(picked(garage, "map").id === "touge");
 	if (onTouge) {
-		restartTouge();
+		if (picked(garage, "mountainSpawn").id === "base") restartTouge(course.baseSpawn, "LIFT BASE · RIDE OR TELEPORT UP");
+		else restartTouge();
 		fitView();
 		return;
 	}
+	const destination = picked(garage, "place").id;
 	const spot = { smokehouse: SMOKEHOUSE_SPOT, track: track.spawn, pad: track.padSpawn }[destination];
 	placeCar(car, spot.x, spot.z, spot.yaw);
 	bayArmed = false; // leaving the bay shouldn't reopen the garage
@@ -267,8 +306,8 @@ const input = createInput({
 	},
 	onReset: () => {
 		if (mode === "garage") return;
+		if (onTouge) { teleportSummit(); return; }
 		finishScore(score, "Car reset");
-		if (onTouge) { restartTouge(); return; }
 		// Near the road, go back onto it facing the right way. Anywhere else, just get back on your wheels.
 		const near = nearestSample(track, car.pos[0], car.pos[2]);
 		if (near.distance < 40) {
@@ -294,6 +333,7 @@ const input = createInput({
 	},
 	onGarage: openGarage,
 	onCombo: toggleComboBox,
+	onLift: boardLift,
 	isMenuOpen: () => mode === "garage",
 	onMenu: (dx, dy, action) => {
 		sound.unlock();
@@ -406,8 +446,7 @@ const garageUi = createGarageUi($("garage"), garage, progress, {
 		else if (key === "kit" || key === "wheels" || key === "decal") buildCarModel();
 		else if (key === "graphics") applyGraphics();
 		else if (key === "sound") applySound();
-		else if (key === "combo") applyComboBox();
-		else if (key !== "place") applyLook();
+		else if (["paint", "rims", "decalColor", "glow", "smoke"].includes(key)) applyLook();
 		saveGarage();
 	},
 	onDrive: leaveGarage,
@@ -427,6 +466,8 @@ applyComboBox();
 garageUi.render();
 $("sound-btn").addEventListener("click", toggleSound);
 $("combo-toggle").addEventListener("click", toggleComboBox);
+$("summit-return").addEventListener("click", teleportSummit);
+$("lift-return").addEventListener("click", boardLift);
 
 // --- minimap: the road is drawn once, then only the dot moves ---
 const map = $("minimap");
@@ -438,8 +479,9 @@ let mapScale, mapCenterX, mapCenterZ;
 const toMap = (x, z) => [map.width / 2 + (x - mapCenterX) * mapScale, map.height / 2 + (z - mapCenterZ) * mapScale];
 function rebuildMinimap() {
 	const samples = onTouge ? course.samples : track.samples;
-	const xs = samples.map((p) => p.x);
-	const zs = samples.map((p) => p.z);
+	const bounds = onTouge ? [...samples, course.lift.base, course.lift.summit] : samples;
+	const xs = bounds.map((p) => p.x);
+	const zs = bounds.map((p) => p.z);
 	const minX = Math.min(...xs), maxX = Math.max(...xs);
 	const minZ = Math.min(...zs), maxZ = Math.max(...zs);
 	mapCenterX = (minX + maxX) / 2;
@@ -462,6 +504,20 @@ function rebuildMinimap() {
 	path();
 	g.stroke();
 	if (onTouge) {
+		const { base, summit } = course.lift;
+		g.beginPath();
+		g.setLineDash([3, 4]);
+		g.moveTo(...toMap(base.x, base.z));
+		g.lineTo(...toMap(summit.x, summit.z));
+		g.strokeStyle = "#71e0e488";
+		g.lineWidth = 2;
+		g.stroke();
+		g.setLineDash([]);
+		for (const station of [base, summit]) {
+			const [x, z] = toMap(station.x, station.z);
+			g.fillStyle = "#71e0e4";
+			g.fillRect(x - 3, z - 3, 6, 6);
+		}
 		for (const gate of course.gates) {
 			const point = course.samples[gate.index];
 			const [x, z] = toMap(point.x, point.z);
@@ -512,7 +568,7 @@ function updateCamera(dt) {
 	const heading = new THREE.Vector3(look[0], 0, look[2]).normalize();
 	const travel = new THREE.Vector3(car.vel[0], 0, car.vel[2]);
 	// Chase cams sit behind the direction of travel, so you see the car's drift angle.
-	const dir = travel.length() > 3 ? heading.clone().lerp(travel.normalize(), 0.65).normalize() : heading;
+	const dir = car.forwardSpeed > 0 && travel.length() > 3 ? heading.clone().lerp(travel.normalize(), 0.65).normalize() : heading;
 	let target;
 	let lookAt;
 	if (cameraMode === 2) {
@@ -609,7 +665,7 @@ function updateTouge(dt, touchedRail) {
 	if (event?.type === "start") flash("DESCENT STARTED");
 	if (event?.type === "checkpoint") flash(event.label.toUpperCase());
 	if (event?.type === "rail" && awardBonus(score, `Clean rail drift +${event.points} × multiplier`, event.points)) flash("CLEAN RAIL DRIFT");
-	if (event?.type === "void") flash("RUN VOID · RESET TO RETRY");
+	if (event?.type === "void") flash("RUN VOID · RETURN TO SUMMIT TO RETRY");
 	if (event?.type === "finish") {
 		finishScore(score, "Descent finished", true);
 		savePersonalBests(event);
@@ -620,9 +676,15 @@ function updateTouge(dt, touchedRail) {
 	const next = course.gates[tougeRun.nextGate];
 	let line = "Cross START to begin";
 	if (tougeRun.status === "running") line = `${clock(tougeRun.time)} · NEXT ${next.label.toUpperCase()}`;
-	if (tougeRun.status === "finished") line = `FINISH ${clock(tougeRun.time)} · ${tougeRun.score.toLocaleString()} PTS · RESET TO RETRY`;
-	if (tougeRun.status === "invalid") line = `RUN VOID · ${tougeRun.reason} · RESET TO RETRY`;
+	if (tougeRun.status === "finished") line = `FINISH ${clock(tougeRun.time)} · ${tougeRun.score.toLocaleString()} PTS · LIFT AHEAD`;
+	if (tougeRun.status === "invalid") line = `RUN VOID · ${tougeRun.reason} · RETURN TO SUMMIT`;
+	if (tougeRun.status === "practice") line = "Lift Base · Ride the lift or teleport to start a timed run";
 	$("lap-line").textContent = line + best;
+	const liftButton = $("lift-return");
+	liftButton.hidden = !atLiftBase();
+	liftButton.disabled = car.speed >= 8;
+	const liftLabel = liftButton.disabled ? "SLOW FOR LIFT" : "RIDE LIFT";
+	if (liftButton.textContent !== liftLabel) liftButton.textContent = liftLabel;
 }
 
 // --- main loop: fixed-rate physics, render every frame ---
@@ -644,7 +706,31 @@ function garageFrame(dt) {
 	sound.idle();
 }
 
+const liftHeading = new THREE.Vector3(course.lift.summit.x - course.lift.base.x, 0, course.lift.summit.z - course.lift.base.z).normalize();
+const liftSide = new THREE.Vector3(-liftHeading.z, 0, liftHeading.x);
+function liftFrame(dt) {
+	liftTravel += dt;
+	const t = Math.min(1, liftTravel / LIFT_SECONDS);
+	const position = liftRig.move(t * t * (3 - 2 * t));
+	if (t === 1) {
+		liftTravel = null;
+		restartTouge(course.spawn, "SUMMIT · CROSS START TO BEGIN");
+		return;
+	}
+	car.pos = [position.x, position.y + 0.8, position.z];
+	model.update(car);
+	const side = 12 + 4 * Math.sin(Math.PI * t);
+	camera.position.copy(position).addScaledVector(liftSide, side).addScaledVector(liftHeading, -5);
+	camera.position.y += 5;
+	camLook.copy(position).addScaledVector(liftHeading, 4);
+	camera.lookAt(camLook);
+	aimSun(position.x, position.z);
+	sound.idle();
+	drawMinimap();
+}
+
 function driveFrame(dt, controls) {
+	if (liftTravel !== null) return liftFrame(dt);
 	accumulator += dt;
 	sparkWait -= dt;
 	let touchedRail = false;
@@ -660,7 +746,7 @@ function driveFrame(dt, controls) {
 		stepScore(score, { ...car, up: carAxes(car).up[1] }, PHYSICS_DT);
 		accumulator -= PHYSICS_DT;
 	}
-	if (car.pos[1] < -20 || car.pos.some((n) => !Number.isFinite(n))) {
+	if (car.pos.some((n) => !Number.isFinite(n)) || car.pos[1] < world.groundHeight(car.pos[0], car.pos[2]) - 20) {
 		finishScore(score, "Car recovered");
 		if (onTouge) restartTouge();
 		else placeCar(car, track.spawn.x, track.spawn.z, track.spawn.yaw);
@@ -676,10 +762,11 @@ function driveFrame(dt, controls) {
 	payBanked();
 	if (!onTouge) checkBay();
 	updateCamera(dt);
-	sound.update(car, controls, tuning.TopSpeed / CAR.TopSpeed);
+	sound.update(car, tuning.TopSpeed, tuning.ReverseSpeed);
 	drawMinimap();
 
 	$("speed").textContent = Math.round(car.speed * 3.6);
+	$("unit").textContent = car.burnout ? (car.drive < 0 ? "REVERSE BURNOUT" : "BURNOUT") : car.drive < 0 || car.forwardSpeed < -1 ? "KM/H · REVERSE" : "KM/H";
 	const angle = Math.abs(car.driftAngle);
 	$("angle").textContent = angle > 5 ? `${Math.round(angle)}°` : "";
 	$("angle-bar").style.width = `${Math.min(100, (angle / 70) * 100)}%`;

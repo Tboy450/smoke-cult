@@ -1,6 +1,6 @@
 # SMOKE CULT — update checklist
 
-Updated November 7, 2026. Current update: Cinder Pass ridge detail and road textures.
+Updated November 7, 2026. Current update: longer Cinder Pass, summit returns, separate map and spawn controls, and burnout handling.
 Prior recovered garage update: `ff2879e`.
 
 This is the shared checklist for continuing SMOKE CULT. Update it whenever a feature is completed,
@@ -18,6 +18,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Five original code-built cars with different handling.
 - [x] Smokehouse garage, drive-in bay and track/test-pad spawn choices.
 - [x] Garage tabs with keyboard, controller and touch navigation.
+- [x] Separate Map and Spawn rows in Game, with each map remembering its own spawn and older garage saves carried forward.
 - [x] Body kits and five wheel styles.
 - [x] Decals: twin stripes, side slash, flames, checker fade and Cult Ring.
 - [x] Custom color wheel and brightness for body, wheels and decals.
@@ -27,6 +28,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Compact combo HUD and low-graphics option.
 - [x] Larger touch minimize/expand button for the whole score/lap panel; short collapsed strip and saved preference.
 - [x] New mobile sessions default to a compact score/lap panel without overriding existing saved choices.
+- [x] Score panel size is controlled from the driving HUD. The garage and tuning panels scroll on short landscape screens, with Drive fixed below the garage settings.
 - [x] Color-wheel brightness through Q/E or controller LB/RB, native keyboard slider input and percentage display.
 - [x] Color wheel tracks one finger and stops on release, lost pointer capture, cancellation or picker closure.
 - [x] Live tuning with keyboard/controller driving while adjusting settings.
@@ -34,6 +36,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Tuning labels, explanations and unit conversions for display; opening/switching modes preserves exact car and upgrade values.
 - [x] Clipboard tuning export with selected on-screen text fallback, Show values and car-named JSON downloads.
 - [x] Assist-dependent gravel behavior, including grip, drag and braking.
+- [x] Forward and reverse burnouts, smoke that follows wheelspin, engine revs and squeal that ease as grip returns, and smoother acceleration and drift steering.
 - [x] Recovered Claude's uncommitted update, backed it up, committed all required modules and published it.
 
 ## Verification completed
@@ -47,6 +50,8 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] All 89 Node tests and scripted physics checks passed with Cinder Pass. A stock car completed all gates in order with no rail contact in the physics simulation.
 - [x] Desktop browser smoke check covered garage route selection, the start timer, restart and returning to Rustline Yard.
 - [x] Desktop browser visual check covered the updated ridge at the start gate and approach to the first switchback. All 89 Node tests and scripted physics checks passed again.
+- [x] All 93 Node tests and scripted physics checks passed with the longer descent. A stock car completed all six checkpoints and the finish without rail contact in simulation.
+- [x] Browser checks covered both map spawns, summit teleport, the complete cable lift ride, forward and reverse smoke, score collapse and expansion, and garage and tuning scrolling at 740 × 320.
 - [x] User reports the game seems to work on their phone (basic play feedback, November 6).
 - [x] Headless physics checks passed for Arcade, Balanced and Off.
 - [x] All source JavaScript files passed syntax checks.
@@ -55,9 +60,8 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Earlier scoring HUD was visually checked at desktop, 390×844 and 844×390.
 - [x] GitHub Pages build and public availability of recovered color-wheel markup, decals and upgrade code verified.
 
-The browser checker timed out during recovery and again during this follow-up. The earlier visual checks do **not**
-cover the recovered garage, current HUD/control changes or new tuning layout. New interaction checks use drawing/DOM
-stubs, not visual rendering. Detailed visual and device checks remain deferred at the user's request.
+The early recovery browser checks timed out. The completed checks above cover the named interactions and screen sizes.
+Detailed visual and device checks remain deferred at the user's request.
 
 ## Deferred device and visual testing
 
@@ -84,6 +88,7 @@ Their basic phone check is recorded above; it does not close the detailed checks
 - [x] Cinder Pass minimap, checkpoint and finish feedback, restart and separate local records.
 - [x] Clean guardrail proximity bonus on Cinder Pass.
 - [x] Cinder Pass 3D ridge relief, a sparse pine line, low haze and finer asphalt and gravel textures.
+- [x] Extend Cinder Pass to a 1.23 km timed descent with six switchbacks and fresh course records. Add a summit teleport, a rideable car lift and a Lift Base spawn.
 - [ ] More original maps and additional smoke/style scoring.
 - [x] Save best banked combo, fastest valid lap and highest valid lap points in the current browser.
 - [ ] Further progression, unlocks and economy balancing after play feedback.

@@ -67,11 +67,18 @@ export const OPTIONS = {
 		{ id: "violet", name: "Violet", color: 0xa070ff },
 		{ id: "black", name: "Soot", color: 0x303036 },
 	],
+	map: [
+		{ id: "yard", name: "Rustline Yard" },
+		{ id: "touge", name: "Cinder Pass" },
+	],
 	place: [
 		{ id: "smokehouse", name: "Out the Door" },
 		{ id: "track", name: "Start Line" },
 		{ id: "pad", name: "Test Pad" },
-		{ id: "touge", name: "Cinder Pass" },
+	],
+	mountainSpawn: [
+		{ id: "summit", name: "Summit Start" },
+		{ id: "base", name: "Lift Base" },
 	],
 	sound: [
 		{ id: "on", name: "On" },
@@ -89,7 +96,7 @@ export const OPTIONS = {
 
 export const LABELS = {
 	car: "CAR", kit: "BODY KIT", wheels: "WHEELS", rims: "WHEEL COLOR", paint: "BODY COLOR", decal: "DECAL", decalColor: "DECAL COLOR",
-	glow: "UNDERGLOW", smoke: "TIRE SMOKE", place: "DRIVE AT", sound: "SOUND", combo: "COMBO BOX", graphics: "GRAPHICS",
+	glow: "UNDERGLOW", smoke: "TIRE SMOKE", map: "MAP", place: "SPAWN", mountainSpawn: "SPAWN", sound: "SOUND", graphics: "GRAPHICS",
 };
 
 // Colors you can also set with the color wheel.
@@ -99,7 +106,7 @@ export const TABS = [
 	{ id: "car", label: "CAR", rows: ["car", "kit", "wheels", "rims"] },
 	{ id: "paint", label: "PAINT", rows: ["paint", "decal", "decalColor", "glow", "smoke"] },
 	{ id: "upgrades", label: "UPGRADES", rows: PARTS.map((p) => `part:${p.id}`) },
-	{ id: "game", label: "GAME", rows: ["place", "sound", "combo", "graphics"] },
+	{ id: "game", label: "GAME", rows: ["map", "place", "sound", "graphics"] },
 ];
 
 const validColor = (c) => Number.isInteger(c) && c >= 0 && c <= 0xffffff;
@@ -110,6 +117,7 @@ export function createGarageState(saved = null, lowGraphics = false) {
 		const found = OPTIONS[key].findIndex((o) => o.id === saved?.[key]);
 		state[key] = found >= 0 ? found : 0;
 	}
+	if (saved?.map === undefined && saved?.place === "touge") state.map = 1;
 	for (const key of WHEEL_COLORS) if (validColor(saved?.custom?.[key])) state.custom[key] = saved.custom[key];
 	if (saved?.graphics === undefined && lowGraphics) state.graphics = 1;
 	if (saved?.combo === undefined && lowGraphics) state.combo = 1;
@@ -117,7 +125,8 @@ export function createGarageState(saved = null, lowGraphics = false) {
 }
 
 export const picked = (state, key) => OPTIONS[key][state[key]];
-export const currentRows = (state) => TABS[state.tab].rows;
+export const spawnKey = (state) => picked(state, "map").id === "touge" ? "mountainSpawn" : "place";
+export const currentRows = (state) => TABS[state.tab].rows.map((row) => row === "place" ? spawnKey(state) : row);
 export const currentRow = (state) => currentRows(state)[state.row];
 export const isPartRow = (row) => row.startsWith("part:");
 

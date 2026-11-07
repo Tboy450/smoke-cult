@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { CAR } from '../src/tuning.js';
 import { buy, carTuning, createProgress, earn, levelsFor, MAX_STAGE, nextPrice, PARTS, stageOf, STAGE_PRICES } from '../src/upgrades.js';
 import {
-  colorOf, createGarageState, currentRow, hexToHsv, hsvToHex, isPartRow, moveGarage, OPTIONS, picked, saveData, setCustomColor, stepOption, switchTab, TABS,
+  colorOf, createGarageState, currentRow, currentRows, hexToHsv, hsvToHex, isPartRow, moveGarage, OPTIONS, picked, saveData, setCustomColor, stepOption, switchTab, TABS,
 } from '../src/garageState.js';
 
 test('buying walks through the stages, charges the right price and stops at the top', () => {
@@ -51,9 +51,10 @@ test('saved progress is checked before it is trusted', () => {
   assert.equal(stageOf(round, 'hex', 'tires'), 3);
 });
 
-test('garage tabs hold every option, and every part has a row', () => {
-  const rows = TABS.flatMap((t) => t.rows);
-  for (const key of Object.keys(OPTIONS)) assert.ok(rows.includes(key), `${key} has no row`);
+test('garage tabs hold every selectable option and every part has a row', () => {
+  const rows = TABS.flatMap((_, tab) => [...currentRows({ tab, map: 0 }), ...currentRows({ tab, map: 1 })]);
+  for (const key of Object.keys(OPTIONS).filter((key) => key !== 'combo')) assert.ok(rows.includes(key), `${key} has no row`);
+  assert.ok(!rows.includes('combo'), 'the score panel has its own toggle');
   for (const part of PARTS) assert.ok(rows.includes(`part:${part.id}`), `${part.id} has no row`);
 });
 

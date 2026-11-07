@@ -8,11 +8,15 @@ the same site adapts to your screen. The game opens in the garage. Pick a car, p
 **Where you drive:** Rustline Yard, an invented industrial yard with a 1.6 km circuit wrapped around a test pad.
 Walls are solid, gravel has less grip, and hitting a wall hard ends your combo. Cross the start line to time a lap.
 
-**Cinder Pass** is a 613 m timed descent through three mountain hairpins. In **Garage → Game → Drive At**, choose
-**Cinder Pass** and drive out. Cross START, follow the three checkpoint gates in order, then cross FINISH. The minimap
-highlights the next gate and the score strip shows progress. Reset returns you to the start for another run.
+Choose a **Map** and a **Spawn** in **Garage → Game**. Rustline Yard offers Out the Door, Start Line and Test Pad.
+Cinder Pass offers Summit Start for timed runs and Lift Base to explore the bottom of the route.
+
+**Cinder Pass** is a 1.23 km timed descent through six mountain hairpins. Cross START, follow the six checkpoint
+gates in order, then cross FINISH. Slow down by the lift after the finish and choose **Ride Lift** for a cable ride
+with your car. **↑ Summit** teleports you to the top at any point. The minimap shows the next gate and the lift line.
 Hold a clean drift near a guardrail to earn 200 points before the combo multiplier. The bonus is available once per
 section between gates. Rail contact interrupts the bonus. The finish banks your active combo and shows time and points.
+Times and run scores for the longer route start fresh. Your best combo carries over.
 
 **Cars:** Cinder 2D, Razor Kei, Mule V8, Soot Wagon and Hex Prototype. All are invented for this game, and each
 has its own handling. Your car and colours are remembered in this browser.
@@ -28,6 +32,7 @@ The Upgrades tab spends banked drift points on per-car engine, tires, angle-kit 
 | Handbrake | A or X | HB | Space |
 | Assist preset | D-pad Up | ASSIST | T |
 | Reset | D-pad Down | RESET | R |
+| Ride lift at Cinder Pass base | B / Circle | RIDE LIFT | L |
 | Camera | Y | CAM | C |
 | Garage | Menu | GARAGE | G |
 | Tuning | View | TUNE | Tab |
@@ -35,6 +40,7 @@ The Upgrades tab spends banked drift points on per-car engine, tires, angle-kit 
 
 In the garage, use the D-pad or stick to choose and LB/RB to switch tabs. A buys, opens a color picker or drives,
 depending on the selected row. Keyboard: arrows, Q/E for tabs and Enter to select. Touch: tap the controls.
+On short screens, scroll the garage options above the Drive button.
 
 With a color wheel open, arrows/D-pad adjust hue and saturation; Q/E or LB/RB adjust brightness.
 The brightness slider also accepts normal keyboard arrow adjustments.
@@ -54,6 +60,9 @@ the full panel. H does the same on keyboard. The choice is remembered; new mobil
 **Sound** is on by default and starts on your first tap or key press, as browsers require. On iPhones, the ring/silent
 switch can also mute it.
 
+**Burnouts:** from low speed, hold gas and brake together to spin the rear tires while the front brakes hold the car.
+Gas with handbrake gives a rolling burnout. Hold brake/reverse and handbrake from a stop for a reverse burnout.
+
 **Scoring** starts at 12° and 29 km/h. Angle and speed earn points, and sustained drifts build a multiplier up to ×3.
 Link another drift within 1.5 seconds to keep the combo. Clean side changes earn a bonus, and so do the pink clip zones
 on the outside of corners (hold at least 20° through them, once per lap each). Straightening or slowing down banks your
@@ -68,4 +77,4 @@ loads from the internet. Don't open `index.html` directly: browsers block its Ja
 
 Tests: `node --test tests/*.test.mjs` then `node tests/physics-check.mjs`.
 
-Early build: car models are built in code, and it hasn't been tested on a real phone or controller yet.
+Car models are built in code. Detailed testing on real phones and controllers is still open.

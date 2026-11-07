@@ -9,7 +9,7 @@ const GATE_TOLERANCE = 12;
 export function createTougeRun(course, spawn = course.spawn) {
 	const { s } = course.nearest(spawn.x, spawn.z);
 	return {
-		status: "ready", reason: "", time: 0, score: 0, startScore: 0,
+		status: s < course.samples[course.gates[0].index].s ? "ready" : "practice", reason: "", time: 0, score: 0, startScore: 0,
 		nextGate: 0, lastGate: -1, s, maxS: s, progress: 0,
 		previousX: spawn.x, previousZ: spawn.z,
 		railTime: 0, railSide: 0, railCooldown: 0, bonusGate: -1,
@@ -47,7 +47,7 @@ function nearRail(car, course, position) {
 // scoreNow is banked + pending points, so a combo can carry across gates without counting earlier points again.
 // Return one event for each noteworthy change, or null. The caller applies rail bonuses through the combo scorer.
 export function stepTougeRun(run, course, car, dt, scoreNow, { touchedRail = false, comboActive = true } = {}) {
-	if (run.status === "invalid" || run.status === "finished" || !Number.isFinite(dt) || dt <= 0) return null;
+	if ((run.status !== "ready" && run.status !== "running") || !Number.isFinite(dt) || dt <= 0) return null;
 	const [x, , z] = car.pos;
 	if (!Number.isFinite(x) || !Number.isFinite(z)) return invalidate(run, "Car recovered");
 	const fromX = run.previousX;

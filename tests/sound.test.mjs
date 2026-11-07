@@ -118,6 +118,37 @@ test('a browser with no audio support does not crash the game', () => {
   const sound = createSound({ AudioContextClass: undefined, events: b.events, doc: b.doc });
   b.fire('click', true);
   sound.idle();
-  sound.update({ forwardSpeed: 10, wheels: [] }, { throttle: 1 });
+  sound.update({ forwardSpeed: 10, wheels: [] }, 60, 12);
   assert.equal(sound.state, 'not started');
+});
+
+test('reverse wheelspin revs and squeals at low speed, then quiets when the tires grip', () => {
+  const b = fakeBrowser();
+  const oscillators = [], gains = [];
+  const Context = b.AudioContextClass;
+  b.AudioContextClass = class extends Context {
+    createOscillator() {
+      const oscillator = super.createOscillator();
+      oscillator.frequency.setTargetAtTime = (value) => (oscillator.frequency.value = value);
+      oscillators.push(oscillator);
+      return oscillator;
+    }
+    createGain() {
+      const gain = super.createGain();
+      gain.gain.setTargetAtTime = (value) => (gain.gain.value = value);
+      gains.push(gain);
+      return gain;
+    }
+  };
+  const sound = make(b);
+  b.fire('click', true);
+  const wheels = (spin) => [0, 1, 2, 3].map((i) => ({ def: { front: i < 2 }, wheelspin: i < 2 ? 0 : spin, slip: i < 2 ? 0 : Math.abs(spin) }));
+  sound.update({ drive: -1, forwardSpeed: -2, wheels: wheels(0) }, 60, 12);
+  const rollingPitch = oscillators[0].frequency.value;
+  sound.update({ drive: -1, forwardSpeed: -2, wheels: wheels(-12) }, 60, 12);
+  assert.ok(oscillators[0].frequency.value > rollingPitch + 40);
+  assert.ok(gains[2].gain.value > 0.4);
+  sound.update({ drive: 0, forwardSpeed: -2, wheels: wheels(0) }, 60, 12);
+  assert.equal(gains[2].gain.value, 0);
+  assert.ok(oscillators[0].frequency.value < rollingPitch);
 });

@@ -38,6 +38,11 @@ export function stepScore(s, car, dt) {
 	if (![car.speed, car.forwardSpeed, angle].every(Number.isFinite)) {
 		finishScore(s, "Car recovered"); return;
 	}
+	if (car.drive < 0 && car.forwardSpeed <= 0) {
+		finishScore(s, "Reversing");
+		s.hint = "Drive forward to score drifts";
+		return;
+	}
 	if (car.up < 0.4 || angle > SCORE_RULES.maxAngle || (car.speed > 4 && car.forwardSpeed <= 0)) {
 		finishScore(s, "Spun out"); s.hint = "Recover the car to start another drift"; return;
 	}

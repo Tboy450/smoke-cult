@@ -17,6 +17,34 @@ const dt = 1 / 240;
 const idle = { throttle: 0, brake: 0, steer: 0, handbrake: false };
 const maxed = Object.fromEntries(PARTS.map((p) => [p.id, MAX_STAGE]));
 
+test('burnouts hold forward torque, spin backwards in reverse, and stop smoking after release', () => {
+  const run = (car, seconds, controls) => {
+    for (let i = 0; i < seconds / dt; i++) stepCar(car, { ...idle, ...controls }, CAR, dt);
+  };
+  const stationary = createCar(CAR);
+  run(stationary, 1, idle);
+  run(stationary, 3, { throttle: 1, brake: 1 });
+  assert.ok(stationary.burnout && stationary.drive > 0);
+  assert.ok(Math.abs(stationary.forwardSpeed) < 1);
+  assert.ok(stationary.wheels.slice(2).every((wheel) => wheel.wheelspin > 8));
+  run(stationary, 0.35, idle);
+  assert.ok(stationary.wheels.every((wheel) => wheel.slip < 3));
+
+  const backing = createCar(CAR);
+  run(backing, 1, idle);
+  run(backing, 2, { brake: 1, handbrake: true });
+  assert.ok(backing.burnout && backing.forwardSpeed < -2);
+  assert.ok(backing.wheels.slice(2).every((wheel) => wheel.wheelspin < -8 && wheel.spin < 0));
+  run(backing, 3, { brake: 1 });
+  assert.ok(!backing.burnout && backing.forwardSpeed < -7 && backing.forwardSpeed > -CAR.ReverseSpeed);
+
+  const sideways = createCar(CAR);
+  run(sideways, 1, idle);
+  sideways.vel = [12, 0, 0];
+  run(sideways, dt, { brake: 1 });
+  assert.equal(sideways.drive, 0, 'braking a fast sideways slide must not engage reverse');
+});
+
 function startLap(def, tuning, preset) {
   const car = createCar(tuning, [0, 1, 0], 0, def.wheels, def.body);
   car.preset = preset;

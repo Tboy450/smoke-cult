@@ -54,7 +54,8 @@ export function createEffects(scene) {
 				}
 				const p = new THREE.Vector3(w.contact[0], w.contact[1] + 0.012, w.contact[2]);
 				// Smoke, more the harder the tire slides.
-				const spawn = !w.def.front && Math.random() < Math.min(1, (w.slip - 2) / 6) * dt * 60;
+				const smokeRate = car.burnout ? 24 : 60;
+				const spawn = !w.def.front && Math.random() < Math.min(1, (w.slip - 2) / 6) * dt * smokeRate;
 				if (spawn) {
 					const puff = puffs[nextPuff];
 					nextPuff = (nextPuff + 1) % puffs.length;

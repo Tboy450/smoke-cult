@@ -5,7 +5,7 @@ import { createColorWheel } from "./colorWheel.js";
 import { CAR, RANGES } from "./tuning.js";
 import { carById } from "./cars.js";
 import {
-	colorOf, currentRow, currentRows, isPartRow, LABELS, moveGarage, picked, setCustomColor, stepOption, switchTab, TABS, WHEEL_COLORS,
+	colorOf, currentRow, currentRows, isPartRow, LABELS, moveGarage, picked, setCustomColor, spawnKey, stepOption, switchTab, TABS, WHEEL_COLORS,
 } from "./garageState.js";
 import { carTuning, levelsFor, MAX_STAGE, nextPrice, PARTS, stageOf } from "./upgrades.js";
 
@@ -21,6 +21,7 @@ const STATS = [
 
 export function createGarageUi(root, state, progress, { onChange, onDrive, onBuy }) {
 	const rowsEl = root.querySelector("#garage-rows");
+	const scroll = root.querySelector("#garage-scroll");
 	const note = root.querySelector("#garage-note");
 	const picker = root.querySelector("#picker");
 	let pickerKey = null;
@@ -82,7 +83,11 @@ export function createGarageUi(root, state, progress, { onChange, onDrive, onBuy
 			const [min, max] = RANGES[range];
 			bar.style.width = `${Math.round(Math.min(1, (read(tuning) - min) / (max - min)) * 100)}%`;
 		});
-		root.querySelector("#garage-drive").textContent = `DRIVE · ${picked(state, "place").name.toUpperCase()}`;
+		const drive = root.querySelector("#garage-drive");
+		const map = picked(state, "map").name;
+		const spawn = picked(state, spawnKey(state)).name;
+		drive.textContent = `DRIVE · ${map.toUpperCase()}`;
+		drive.setAttribute("aria-label", `Drive ${map} from ${spawn}`);
 	}
 
 	function closePicker() {
@@ -95,7 +100,6 @@ export function createGarageUi(root, state, progress, { onChange, onDrive, onBuy
 		pickerKey = key;
 		root.querySelector("#picker-title").textContent = LABELS[key];
 		picker.classList.add("open");
-		root.scrollTop = 0;
 		wheel.show(colorOf(state, key));
 	}
 
@@ -115,6 +119,7 @@ export function createGarageUi(root, state, progress, { onChange, onDrive, onBuy
 		if (tab) {
 			state.tab = Number(tab.dataset.tab);
 			state.row = 0;
+			scroll.scrollTop = 0;
 			say("");
 			return render();
 		}
@@ -135,10 +140,12 @@ export function createGarageUi(root, state, progress, { onChange, onDrive, onBuy
 			const changed = moveGarage(state, dx, dy);
 			if (changed) onChange(changed);
 			render();
+			if (dy) rowsEl.querySelector(".grow.focus")?.scrollIntoView({ block: "nearest" });
 		},
 		tab(dx) {
 			if (pickerKey) return wheel.brightness(dx);
 			switchTab(state, dx);
+			scroll.scrollTop = 0;
 			say("");
 			render();
 		},
