@@ -52,7 +52,8 @@ switch can also mute it.
 Link another drift within 1.5 seconds to keep the combo. Clean side changes earn a bonus, and so do the pink clip zones
 on the outside of corners (hold at least 20° through them, once per lap each). Straightening or slowing down banks your
 points after that grace period. Spinouts, hard wall hits, cone hits, resets and assist changes lose the pending combo.
-The upgrade bank and purchased parts are saved in this browser. Best laps and best combo are page-session records.
+The upgrade bank, purchased parts and personal bests are saved in this browser. The full score panel shows
+your best banked combo, fastest valid lap and highest valid lap score across cars.
 
 ## Run it locally
 

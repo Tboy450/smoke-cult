@@ -1,6 +1,6 @@
 # SMOKE CULT — update checklist
 
-Updated November 6, 2026. Current update: usable tuning export when clipboard access is blocked, plus downloadable tuning snapshots.
+Updated November 7, 2026. Current update: personal bests persist in the browser alongside garage progress.
 Prior recovered garage update: `ff2879e`.
 
 This is the shared checklist for continuing SMOKE CULT. Update it whenever a feature is completed,
@@ -43,6 +43,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] All 69 Node tests and scripted physics checks passed after the HUD and picker fixes.
 - [x] All 73 Node tests and scripted physics checks passed after Simple/Advanced tuning; tests cover exact-value preservation, units, edits and keyboard tab selection.
 - [x] All 78 Node tests and scripted physics checks passed after export improvements; missing/denied clipboard, download contents/failure, delayed responses and text-selection controls are covered.
+- [x] All 80 Node tests and scripted physics checks passed with saved records, including save validation and retention of better results from another tab.
 - [x] User reports the game seems to work on their phone (basic play feedback, November 6).
 - [x] Headless physics checks passed for Arcade, Balanced and Off.
 - [x] All source JavaScript files passed syntax checks.
@@ -78,7 +79,7 @@ Their basic phone check is recorded above; it does not close the detailed checks
 - [ ] Original Blender/Houdini car and helmeted driver models; code-built models are still placeholders.
 - [ ] More original maps, starting with a mountain touge if that remains the chosen direction.
 - [ ] Proximity and additional smoke/style scoring.
-- [ ] Decide whether best combos and lap records should persist beyond the page session.
+- [x] Save best banked combo, fastest valid lap and highest valid lap points in the current browser.
 - [ ] Further progression, unlocks and economy balancing after play feedback.
 
 ## Later

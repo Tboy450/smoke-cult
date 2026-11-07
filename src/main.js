@@ -8,6 +8,7 @@ import { createGarageUi } from "./garageUi.js";
 import { colorOf, createGarageState, picked, saveData, stepOption } from "./garageState.js";
 import { createInput, TOUCH_LAYOUT_QUERY } from "./input.js";
 import { createCar, fitCar, placeCar, resetCar, stepCar, carAxes } from "./physics.js";
+import { mergeRecords, readRecords } from "./records.js";
 import { awardBonus, createScore, stepScore, finishScore, SCORE_RULES } from "./scoring.js";
 import { createSound } from "./sound.js";
 import { buildTrack, collideCar, createLap, createTrackWorld, GARAGE, inGarageBay, nearestSample, resetLap, stepLap, zoneAt } from "./track.js";
@@ -23,6 +24,7 @@ const WALL_HIT = 3.5; // m/s into a wall that ends a combo; anything softer is a
 const CLIP_ANGLE = 20;
 const SAVE_KEY = "smoke-cult-garage";
 const PROGRESS_KEY = "smoke-cult-progress";
+const RECORDS_KEY = "smoke-cult-records-v1";
 const BAY_SPEED = 7; // m/s: slow to this in the Smokehouse bay and the garage opens
 const tuning = { ...CAR };
 
@@ -112,6 +114,22 @@ const saveGarage = () => save(SAVE_KEY, saveData(garage));
 const saveProgress = () => save(PROGRESS_KEY, progress);
 const garage = createGarageState(loadSaved(SAVE_KEY), touchLayout.matches);
 const progress = createProgress(loadSaved(PROGRESS_KEY));
+let records = readRecords(loadSaved(RECORDS_KEY));
+function applyRecords() {
+	score.best = records.combo;
+	lap.best = records.lapTime;
+	lap.bestScore = records.lapPoints;
+}
+applyRecords();
+
+function savePersonalBests() {
+	if (score.best === records.combo && lap.best === records.lapTime && lap.bestScore === records.lapPoints) return;
+	const current = readRecords({ combo: score.best, lapTime: lap.best, lapPoints: lap.bestScore });
+	// Retain any better records another tab wrote since this one opened.
+	records = mergeRecords(mergeRecords(records, current), readRecords(loadSaved(RECORDS_KEY)));
+	applyRecords();
+	save(RECORDS_KEY, records);
+}
 // Sound itself starts on the first real tap or key press. Starting it any earlier is what phones refuse.
 const sound = createSound({ enabled: picked(garage, "sound").id === "on" });
 
@@ -139,6 +157,7 @@ function payBanked() {
 	earn(progress, score.total - paidTotal);
 	paidTotal = score.total;
 	saveProgress();
+	savePersonalBests();
 }
 
 function openGarage() {
@@ -475,7 +494,10 @@ const clock = (seconds) => {
 function updateLap(dt) {
 	const earned = score.total + Math.floor(score.points); // a combo still running counts toward the lap
 	const event = stepLap(lap, track, car.pos[0], car.pos[2], car.speed, dt, earned);
-	if (event === "lap") flash(`LAP ${lap.lap} · ${clock(lap.last)}`);
+	if (event === "lap") {
+		savePersonalBests();
+		flash(`LAP ${lap.lap} · ${clock(lap.last)}`);
+	}
 	if (event === "void") flash("Lap void · stay on the road");
 	if (score.active && Math.abs(car.driftAngle) >= CLIP_ANGLE) {
 		const zone = zoneAt(lap, track, car.pos[0], car.pos[2]);
@@ -486,10 +508,10 @@ function updateLap(dt) {
 	}
 	$("wrong-way").style.display = lap.wrongWay ? "block" : "none";
 	$("lap-line").textContent = lap.running
-		? `LAP ${lap.lap + 1} ${clock(lap.time)} · BEST ${clock(lap.best)}${lap.valid ? "" : " · VOID"}`
+		? `LAP ${lap.lap + 1} ${clock(lap.time)} · BEST ${clock(lap.best)}${lap.bestScore ? ` · BEST LAP PTS ${lap.bestScore.toLocaleString()}` : ""}${lap.valid ? "" : " · VOID"}`
 		: lap.best === null
 			? "Cross the start line to time a lap"
-			: `BEST LAP ${clock(lap.best)} · ${lap.bestScore.toLocaleString()} PTS`;
+			: `BEST TIME ${clock(lap.best)} · BEST LAP POINTS ${lap.bestScore.toLocaleString()}`;
 }
 
 // --- main loop: fixed-rate physics, render every frame ---
