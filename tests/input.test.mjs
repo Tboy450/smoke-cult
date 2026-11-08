@@ -6,7 +6,7 @@ test('controls release on focus/capture loss, survive reconnects and work around
   const win = new EventTarget();
   const doc = new EventTarget();
   const elements = new Map();
-  for (const id of ['touch-steer', 'touch-gas', 'touch-brake', 'touch-hb', 'touch-preset', 'touch-reset', 'touch-cam', 'touch-tune', 'touch-garage']) {
+  for (const id of ['touch-steer', 'touch-gas', 'touch-brake', 'touch-hb', 'touch-preset', 'touch-reset', 'touch-cam', 'touch-tune', 'touch-garage', 'vehicle-action']) {
     const element = new EventTarget();
     element.setPointerCapture = () => {};
     elements.set(id, element);
@@ -26,10 +26,11 @@ test('controls release on focus/capture loss, survive reconnects and work around
   let lastController = null;
   let garages = 0;
   let cameras = 0;
+  let interactions = 0;
   let menuOpen = false;
   const menu = [];
   try {
-    const input = createInput({ onPreset() {}, onReset() {}, onCamera() { cameras++; }, onMute() {}, onTune() { tunes++; }, onGarage() { garages++; }, onMenu(dx, dy, action) { menu.push(action ?? `${dx},${dy}`); }, isMenuOpen: () => menuOpen, onController(standard) { lastController = standard; }, isTouchBlocked: () => blocked });
+    const input = createInput({ onPreset() {}, onReset() {}, onCamera() { cameras++; }, onMute() {}, onTune() { tunes++; }, onGarage() { garages++; }, onInteract() { interactions++; }, onMenu(dx, dy, action) { menu.push(action ?? `${dx},${dy}`); }, isMenuOpen: () => menuOpen, onController(standard) { lastController = standard; }, isTouchBlocked: () => blocked });
     emit(win, 'keydown', { code: 'KeyW' });
     input.update(); assert.equal(input.controls.throttle, 1);
     emit(win, 'blur'); input.update(); assert.equal(input.controls.throttle, 0);
@@ -162,6 +163,34 @@ test('controls release on focus/capture loss, survive reconnects and work around
     openPad.buttons[7] = { value: 1, pressed: true }; input.update();
     assert.equal(input.controls.throttle, 0, 'triggers do not drive in the garage');
     menuOpen = false;
+
+    pads = [];
+    emit(win, 'keydown', { code: 'KeyF' });
+    emit(win, 'keydown', { code: 'KeyF', repeat: true });
+    emit(elements.get('vehicle-action'), 'click');
+    assert.equal(interactions, 2, 'keyboard and touch each interact once');
+    emit(win, 'keydown', { code: 'ShiftLeft' });
+    emit(win, 'keydown', { code: 'KeyW' });
+    input.update();
+    assert.deepEqual(input.walk, { x: 0, z: -1, jog: true });
+    emit(win, 'blur');
+    emit(win, 'focus');
+
+    emit(steer, 'pointerdown', { pointerId: 7, clientX: 100, clientY: 150 });
+    emit(steer, 'pointermove', { pointerId: 7, clientX: 145, clientY: 60 });
+    input.update();
+    assert.deepEqual(input.walk, { x: 0.5, z: -1, jog: false });
+    emit(steer, 'pointercancel', { pointerId: 7 });
+    input.update();
+    assert.deepEqual(input.walk, { x: 0, z: 0, jog: false });
+
+    openPad.axes = [0, 0.9];
+    openPad.buttons[5] = { value: 1, pressed: true };
+    pads = [openPad];
+    input.update();
+    input.update();
+    assert.equal(interactions, 3, 'RB interacts once outside the garage');
+    assert.ok(input.walk.z > 0.8, 'the left stick moves on both axes');
   } finally {
     globalThis.document = oldDocument;
     globalThis.addEventListener = oldAdd;

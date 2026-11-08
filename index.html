@@ -82,14 +82,24 @@
 			#wrong-way { display: none; top: 30%; left: 50%; transform: translateX(-50%); padding: 6px 18px; border-radius: 6px;
 				background: #d81830; font-size: 22px; font-weight: 900; letter-spacing: 0.1em; }
 			body.touch #minimap { top: 150px; right: 10px; width: 100px; height: 100px; }
-			#return-tools { position: fixed; z-index: 3; left: 16px; bottom: 54px; gap: 5px; }
+			#world-actions { position: fixed; z-index: 3; left: 16px; bottom: 54px; display: flex; align-items: flex-start; gap: 5px; }
+			#return-tools { gap: 5px; }
 			#return-tools:not([hidden]) { display: flex; }
-			#return-tools button { min-height: 40px; padding: 0 10px; border: 1px solid #71e0e4; border-radius: 6px;
+			#world-actions button { min-height: 40px; padding: 0 10px; border: 1px solid #71e0e4; border-radius: 6px;
 				background: rgba(12, 20, 34, 0.9); color: #e4ffff; font: 800 11px "Segoe UI", system-ui, sans-serif;
 				letter-spacing: 0.06em; cursor: pointer; touch-action: manipulation; }
 			#lift-return:not([hidden]) { background: #14434d; }
 			#lift-return:disabled { opacity: 0.68; cursor: default; }
-			body.garage #return-tools { display: none; }
+			#world-actions #vehicle-action { border-color: #ff6ebf; background: rgba(43, 16, 42, 0.94); }
+			body.garage #world-actions, body.on-foot #return-tools, body.on-foot #score-box, body.on-foot #dash, body.on-foot #preset-box,
+			body.on-foot #touch-gas, body.on-foot #touch-brake, body.on-foot #touch-preset, body.on-foot #touch-cam, body.on-foot #touch-tune { display: none; }
+			body.on-foot #touch-hb { bottom: 26px; }
+			body.on-foot #touch-steer::after { content: 'DRAG TO WALK'; position: absolute; left: 18px; bottom: 104px;
+				color: #f4d8ea; opacity: 0.8; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; pointer-events: none; }
+			@media (orientation: portrait) {
+				body.touch #world-actions { flex-direction: column; left: 10px; }
+				body.touch #world-actions button { padding: 0 7px; }
+			}
 
 			#garage { display: none; position: fixed; z-index: 5; top: 0; bottom: 0; left: 0; width: min(410px, 100vw); padding: 16px 18px 14px;
 				flex-direction: column; gap: 7px; background: linear-gradient(90deg, rgba(10, 4, 16, 0.94) 72%, rgba(10, 4, 16, 0)); }
@@ -228,8 +238,9 @@
 				#touch-reset { right: 104px; }
 				#touch-cam { right: 152px; }
 				#touch-tune { right: 200px; }
-				#return-tools { left: 12px; bottom: 24px; }
-				#return-tools button { min-height: 38px; }
+				#world-actions { left: 12px; bottom: 24px; }
+				#world-actions button { min-height: 38px; }
+				body.on-foot #touch-steer::after { bottom: 69px; }
 			}
 		</style>
 		<script type="importmap">
@@ -270,9 +281,12 @@
 
 		<button id="touch-garage">GARAGE</button>
 		<button id="sound-btn" aria-label="Turn sound on or off">SOUND ON</button>
-		<div id="return-tools" role="group" aria-label="Return to summit" hidden>
-			<button id="summit-return" type="button" aria-label="Teleport to summit" title="Teleport to summit · R or D-pad down">↑ SUMMIT</button>
-			<button id="lift-return" type="button" title="Ride the lift · L or B" hidden>RIDE LIFT</button>
+		<div id="world-actions">
+			<button id="vehicle-action" type="button" aria-keyshortcuts="F" title="Exit when stopped · F or RB" hidden>EXIT CAR</button>
+			<div id="return-tools" role="group" aria-label="Return to summit" hidden>
+				<button id="summit-return" type="button" aria-label="Teleport to summit" title="Teleport to summit · R or D-pad down">↑ SUMMIT</button>
+				<button id="lift-return" type="button" title="Ride the lift · L or B" hidden>RIDE LIFT</button>
+			</div>
 		</div>
 
 		<section id="garage" aria-label="Garage">

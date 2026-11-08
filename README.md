@@ -30,6 +30,7 @@ The Upgrades tab spends banked drift points on per-car engine, tires, angle-kit 
 | Brake / reverse | LT | BRAKE | S |
 | Steer | Left stick | Drag on the left side | A / D |
 | Handbrake | A or X | HB | Space |
+| Exit / enter car | RB / R1 | EXIT CAR / GET IN | F |
 | Assist preset | D-pad Up | ASSIST | T |
 | Reset | D-pad Down | RESET | R |
 | Ride lift at Cinder Pass base | B / Circle | RIDE LIFT | L |
@@ -44,6 +45,10 @@ On short screens, scroll the garage options above the Drive button.
 
 With a color wheel open, arrows/D-pad adjust hue and saturation; Q/E or LB/RB adjust brightness.
 The brightness slider also accepts normal keyboard arrow adjustments.
+
+**On foot:** Stop on your wheels and exit the car. Walk with WASD, the left stick, or a drag on the left side of
+the screen. Hold Shift, A/X, or JOG to move faster. Walk back to a door to get in. R, D-pad Down, or CAR brings you
+back beside the parked car. Leaving the seat during a timed run ends that attempt.
 
 **Live tuning:** open TUNE (Tab on keyboard, View on controller). Simple offers acceleration, front/rear grip,
 steering angle, brakes and bounce control with short explanations. Advanced includes all settings in groups,

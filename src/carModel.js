@@ -4,6 +4,7 @@
 
 import * as THREE from "three";
 import { mergeGeometries, mergeVertices, toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
+import { makeSeatedDriver } from "./driverModel.js";
 
 const DARK = new THREE.MeshStandardMaterial({ color: 0x0d0d11, roughness: 0.8 });
 const TRIM = new THREE.MeshStandardMaterial({ color: 0x17171c, metalness: 0.4, roughness: 0.45 });
@@ -140,21 +141,6 @@ function makeWheel(parts, rimMaterial) {
 	const tire = new THREE.Mesh(parts.tire, TIRE);
 	tire.castShadow = true;
 	group.add(tire, new THREE.Mesh(parts.dish, DARK), new THREE.Mesh(parts.metal, rimMaterial));
-	return group;
-}
-
-function makeDriver(def) {
-	const group = new THREE.Group();
-	const suit = new THREE.MeshStandardMaterial({ color: 0x221a2c, roughness: 0.7 });
-	const shell = new THREE.MeshStandardMaterial({ color: 0xf0ece4, metalness: 0.2, roughness: 0.28 });
-	const visor = new THREE.MeshStandardMaterial({ color: 0x24001a, metalness: 1, roughness: 0.06 });
-	const stripe = new THREE.MeshStandardMaterial({ color: 0xff2aa0, emissive: 0xff2aa0, emissiveIntensity: 1.2 });
-	group.add(box(0.36, 0.34, 0.24, suit, 0, -0.26, 0.02));
-	const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.155, 20, 14), shell);
-	const face = new THREE.Mesh(new THREE.SphereGeometry(0.157, 20, 12, Math.PI * 0.68, Math.PI * 0.64, Math.PI * 0.33, Math.PI * 0.27), visor);
-	const band = new THREE.Mesh(new THREE.TorusGeometry(0.157, 0.012, 6, 28, Math.PI).rotateY(Math.PI / 2), stripe);
-	group.add(helmet, face, band);
-	group.position.set(-def.width * 0.4, def.seatY, def.seatZ);
 	return group;
 }
 
@@ -342,6 +328,7 @@ export function createCarModel(scene, tuning) {
 	});
 	const wheelViews = {};
 	let shell = null;
+	let driver;
 	let token = 0;
 
 	function clear() {
@@ -404,7 +391,8 @@ export function createCarModel(scene, tuning) {
 				shell.add(well);
 			}
 			addDetails(shell, def, paint, kit, archRadius, wheelY);
-			root.add(shell, makeDriver(def));
+			driver = makeSeatedDriver(def);
+			root.add(shell, driver);
 			glow.scale.set(def.width * 3.4, 1, def.length * 1.35);
 			glow.position.y = -(tuning.WheelRadius + tuning.SpringLength * (1 - tuning.StaticSag) + 0.2) + 0.03;
 			root.add(glow);
@@ -417,6 +405,9 @@ export function createCarModel(scene, tuning) {
 				wheelViews[wheelDef.name] = { pivot, spinner };
 			}
 			if (def.glb) useGlb(def, token);
+		},
+		setDriverVisible(visible) {
+			driver.visible = visible;
 		},
 		setLook({ paint: paintColor, rims, glow: glowColor, decal }) {
 			paint.color.setHex(paintColor);

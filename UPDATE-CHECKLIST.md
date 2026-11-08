@@ -1,6 +1,6 @@
 # SMOKE CULT — update checklist
 
-Updated November 7, 2026. Current update: longer Cinder Pass, summit returns, separate map and spawn controls, and burnout handling.
+Updated November 8, 2026. Current update: on-foot driver with animated walking, jogging, and car entry and exit.
 Prior recovered garage update: `ff2879e`.
 
 This is the shared checklist for continuing SMOKE CULT. Update it whenever a feature is completed,
@@ -37,6 +37,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Clipboard tuning export with selected on-screen text fallback, Show values and car-named JSON downloads.
 - [x] Assist-dependent gravel behavior, including grip, drag and braking.
 - [x] Forward and reverse burnouts, smoke that follows wheelspin, engine revs and squeal that ease as grip returns, and smoother acceleration and drift steering.
+- [x] Park, exit, walk or jog with the helmeted driver, and get back in at a clear door. On-foot movement and collisions run separately from rendering.
 - [x] Recovered Claude's uncommitted update, backed it up, committed all required modules and published it.
 
 ## Verification completed
@@ -52,6 +53,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Desktop browser visual check covered the updated ridge at the start gate and approach to the first switchback. All 89 Node tests and scripted physics checks passed again.
 - [x] All 93 Node tests and scripted physics checks passed with the longer descent. A stock car completed all six checkpoints and the finish without rail contact in simulation.
 - [x] Browser checks covered both map spawns, summit teleport, the complete cable lift ride, forward and reverse smoke, score collapse and expansion, and garage and tuning scrolling at 740 × 320.
+- [x] All 96 Node tests and scripted physics checks passed with the on-foot driver. Browser checks covered exit and re-entry on both maps, landscape movement at 740 × 320, blocking exit while moving, and invalidating a timed descent on exit.
 - [x] User reports the game seems to work on their phone (basic play feedback, November 6).
 - [x] Headless physics checks passed for Arcade, Balanced and Off.
 - [x] All source JavaScript files passed syntax checks.

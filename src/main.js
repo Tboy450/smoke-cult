@@ -3,10 +3,12 @@
 import * as THREE from "three";
 import { carById } from "./cars.js";
 import { createCarModel } from "./carModel.js";
+import { createDriverModel } from "./driverModel.js";
 import { createEffects } from "./effects.js";
 import { createGarageUi } from "./garageUi.js";
 import { colorOf, createGarageState, picked, saveData, stepOption } from "./garageState.js";
 import { createInput, TOUCH_LAYOUT_QUERY } from "./input.js";
+import { canEnterCar, createWalker, doorSpots, stepWalker } from "./onFoot.js";
 import { createCar, fitCar, placeCar, resetCar, stepCar, carAxes } from "./physics.js";
 import { mergeRecords, readRecords } from "./records.js";
 import { awardBonus, createScore, stepScore, finishScore, SCORE_RULES } from "./scoring.js";
@@ -94,14 +96,20 @@ const car = createCar(tuning, [track.spawn.x, 1, track.spawn.z], track.spawn.yaw
 const score = createScore();
 const lap = createLap();
 const model = createCarModel(scene, tuning);
+const driver = createDriverModel(scene);
 const effects = createEffects(scene);
 
 // --- HUD ---
 const $ = (id) => document.getElementById(id);
 const HINTS = {
-	keyboard: "W gas · S brake/reverse · A/D steer · SPACE handbrake · T assist · R reset · C camera · G garage · H combo box · TAB tuning · M sound",
-	gamepad: "RT gas · LT brake/reverse · Left stick steer · A/X handbrake · D-pad ↑ assist · D-pad ↓ reset · Y camera · Menu garage · View tuning",
+	keyboard: "W gas · S brake/reverse · A/D steer · SPACE handbrake · F exit car · T assist · R reset · C camera · G garage · H combo box · TAB tuning · M sound",
+	gamepad: "RT gas · LT brake/reverse · Left stick steer · A/X handbrake · RB exit car · D-pad ↑ assist · D-pad ↓ reset · Y camera · Menu garage · View tuning",
 	touch: "Drag left side to steer · GAS / BRAKE / HB on the right",
+};
+const WALK_HINTS = {
+	keyboard: "ON FOOT · WASD walk · Shift jog · F get in at a door · R return to car",
+	gamepad: "ON FOOT · Left stick walk · A/X jog · RB get in at a door · D-pad ↓ return to car",
+	touch: "ON FOOT · Drag left side to walk · Hold JOG to move faster",
 };
 const touchLayout = matchMedia(TOUCH_LAYOUT_QUERY);
 const syncTouchLayout = () => document.body.classList.toggle("touch", touchLayout.matches);
@@ -156,6 +164,11 @@ function savePersonalBests(result) {
 const sound = createSound({ enabled: picked(garage, "sound").id === "on" });
 
 let mode = "garage";
+let walker;
+let parkedDoors;
+let seatTransition = null;
+const SEAT_TRANSITION = 0.3;
+const STILL = { x: 0, z: 0, jog: false };
 let cameraMode = 0; // 0 chase, 1 low drift cam, 2 hood
 const CAMERA_NAMES = ["Chase", "Drift cam", "Hood"];
 const cycle = (list, current) => list[(list.indexOf(current) + 1) % list.length];
@@ -217,6 +230,7 @@ function restartTouge(spot = course.spawn, message = "CROSS START TO BEGIN") {
 	car.pos[1] = spot.y + 1;
 	tougeRun = createTougeRun(course, spot);
 	$("route-progress").value = 0;
+	$("vehicle-action").hidden = false;
 	effects.clear();
 	resetChaseView(spot, spot.y);
 	flash(message);
@@ -234,6 +248,7 @@ function boardLift() {
 	placeCar(car, position.x, position.z, course.baseSpawn.yaw);
 	car.pos[1] = position.y + 0.8;
 	liftTravel = 0;
+	$("vehicle-action").hidden = true;
 	$("lift-return").hidden = true;
 	$("route-progress").value = 0;
 	$("lap-line").textContent = "Riding the lift to the summit";
@@ -255,9 +270,8 @@ function openGarage() {
 	if (mode === "garage") return;
 	finishScore(score, "Back to garage", true);
 	payBanked();
-	mode = "garage";
+	setMode("garage");
 	setRoute(false);
-	document.body.classList.add("garage");
 	yard.garage.setLit(true);
 	garageUi.render();
 	fitView();
@@ -271,8 +285,7 @@ function checkBay() {
 }
 
 function leaveGarage() {
-	mode = "drive";
-	document.body.classList.remove("garage");
+	setMode("drive");
 	yard.garage.setLit(false);
 	saveGarage();
 	setRoute(picked(garage, "map").id === "touge");
@@ -298,6 +311,67 @@ function resetChaseView(spot, ground = 0) {
 	camLook.set(spot.x, ground + 0.6, spot.z);
 }
 
+function setMode(next) {
+	mode = next;
+	const onFoot = mode === "walk";
+	document.body.classList.toggle("garage", mode === "garage");
+	document.body.classList.toggle("on-foot", onFoot);
+	driver.root.visible = onFoot;
+	model.setDriverVisible(!onFoot);
+	$("vehicle-action").hidden = mode === "garage";
+	$("vehicle-action").textContent = onFoot ? "GET IN" : "EXIT CAR";
+	$("vehicle-action").title = onFoot ? "Get in near a door · F or RB" : "Exit when stopped · F or RB";
+	$("touch-hb").textContent = onFoot ? "JOG" : "HB";
+	$("touch-reset").textContent = onFoot ? "CAR" : "RESET";
+	if (onFoot && $("tune").classList.contains("open")) tuningPanel.toggle();
+	if (!onFoot) seatTransition = null;
+	input.clearTouch();
+}
+
+function resetWalker() {
+	walker = createWalker(parkedDoors[0]);
+	driver.update(walker, 0);
+	updateWalkCamera(0, true);
+}
+
+function interactWithCar() {
+	if (mode === "garage" || liftTravel !== null || seatTransition) return;
+	if (mode === "walk") {
+		if (!canEnterCar(walker, parkedDoors, world)) {
+			flash("WALK UP TO A CAR DOOR");
+			return;
+		}
+		seatTransition = { entering: true, elapsed: 0 };
+		return;
+	}
+	if (!car.grounded || Math.hypot(...car.vel) > 1 || carAxes(car).up[1] < 0.8) {
+		flash("STOP ON YOUR WHEELS TO EXIT");
+		return;
+	}
+	parkedDoors = doorSpots(car, world, currentCar().seatZ);
+	if (!parkedDoors.length) {
+		flash("LEAVE ROOM BESIDE A DOOR");
+		return;
+	}
+	finishScore(score, "Parked", true);
+	payBanked();
+	if (!onTouge) resetLap(lap, track, car.pos[0], car.pos[2]);
+	else if (tougeRun.status === "running") {
+		tougeRun.status = "invalid";
+		tougeRun.reason = "Left the car";
+	}
+	car.vel.fill(0);
+	car.angVel.fill(0);
+	car.speed = car.forwardSpeed = car.driftAngle = car.drive = 0;
+	car.burnout = false;
+	for (const wheel of car.wheels) wheel.slip = wheel.wheelspin = 0;
+	$("wrong-way").style.display = "none";
+	setMode("walk");
+	resetWalker();
+	seatTransition = { entering: false, elapsed: 0 };
+	flash("ON FOOT");
+}
+
 const input = createInput({
 	onPreset: () => {
 		finishScore(score, "Assist changed");
@@ -306,6 +380,7 @@ const input = createInput({
 	},
 	onReset: () => {
 		if (mode === "garage") return;
+		if (mode === "walk") { seatTransition = null; resetWalker(); return; }
 		if (onTouge) { teleportSummit(); return; }
 		finishScore(score, "Car reset");
 		// Near the road, go back onto it facing the right way. Anywhere else, just get back on your wheels.
@@ -321,11 +396,11 @@ const input = createInput({
 		resetCones();
 	},
 	onCamera: () => {
-		if (mode === "garage") return;
+		if (mode !== "drive") return;
 		cameraMode = (cameraMode + 1) % CAMERA_NAMES.length;
 		flash(CAMERA_NAMES[cameraMode]);
 	},
-	onTune: () => tuningPanel.toggle(),
+	onTune: () => { if (mode !== "walk") tuningPanel.toggle(); },
 	onMute: toggleSound,
 	onController: (standard) => {
 		sound.unlock();
@@ -334,6 +409,7 @@ const input = createInput({
 	onGarage: openGarage,
 	onCombo: toggleComboBox,
 	onLift: boardLift,
+	onInteract: interactWithCar,
 	isMenuOpen: () => mode === "garage",
 	onMenu: (dx, dy, action) => {
 		sound.unlock();
@@ -394,6 +470,7 @@ function applyLook() {
 }
 function buildCarModel() {
 	model.setCar(currentCar(), { kit: picked(garage, "kit").id, wheels: picked(garage, "wheels").id, decal: picked(garage, "decal").id });
+	model.setDriverVisible(mode !== "walk");
 	applyLook();
 }
 function applyCar() {
@@ -549,8 +626,13 @@ function drawMinimap() {
 		mapContext.lineWidth = 2;
 		mapContext.strokeRect(x - 6, z - 6, 12, 12);
 	}
-	const [x, y] = toMap(car.pos[0], car.pos[2]);
-	mapContext.fillStyle = "#ffd23f";
+	const [parkedX, parkedY] = toMap(car.pos[0], car.pos[2]);
+	if (mode === "walk") {
+		mapContext.fillStyle = "#ffd23f";
+		mapContext.fillRect(parkedX - 3, parkedY - 3, 6, 6);
+	}
+	const [x, y] = mode === "walk" ? toMap(walker.x, walker.z) : [parkedX, parkedY];
+	mapContext.fillStyle = mode === "walk" ? "#ff70c0" : "#ffd23f";
 	mapContext.strokeStyle = "#120818";
 	mapContext.lineWidth = 2;
 	mapContext.beginPath();
@@ -594,6 +676,31 @@ function aimSun(x, z) {
 	const height = world.groundHeight(x, z);
 	sun.position.set(x + 58, height + 62, z - 42);
 	sun.target.position.set(x, height, z);
+}
+
+const walkCameraTarget = new THREE.Vector3();
+const walkLookTarget = new THREE.Vector3();
+function updateWalkCamera(dt, snap = false) {
+	const sin = Math.sin(walker.viewYaw), cos = Math.cos(walker.viewYaw);
+	const dx = 4.2 * sin + 0.55 * cos;
+	const dz = 4.2 * cos - 0.55 * sin;
+	let reach = 0;
+	for (let step = 1; step <= 10; step++) {
+		const fraction = step / 10;
+		if (world.contact(walker.x + dx * fraction, walker.z + dz * fraction)) break;
+		reach = fraction;
+	}
+	const x = walker.x + dx * reach, z = walker.z + dz * reach;
+	walkCameraTarget.set(x, Math.max(walker.y, world.groundHeight(x, z)) + 2.5, z);
+	walkLookTarget.set(walker.x + 0.55 * cos * reach, walker.y + 1.03, walker.z - 0.55 * sin * reach);
+	const ease = snap ? 1 : 1 - Math.exp(-dt * 10);
+	camPos.lerp(walkCameraTarget, ease);
+	camLook.lerp(walkLookTarget, ease);
+	camera.position.copy(camPos);
+	camera.lookAt(camLook);
+	camera.fov += (58 - camera.fov) * ease;
+	camera.updateProjectionMatrix();
+	aimSun(walker.x, walker.z);
 }
 
 // --- cones get knocked flying ---
@@ -785,13 +892,42 @@ function driveFrame(dt, controls) {
 	$("hint").textContent = HINTS[input.device];
 }
 
+function walkFrame(dt) {
+	stepWalker(walker, seatTransition ? STILL : input.walk, car, world, dt);
+	let crouch = 0;
+	if (seatTransition) {
+		seatTransition.elapsed += dt;
+		const t = Math.min(1, seatTransition.elapsed / SEAT_TRANSITION);
+		const eased = t * t * (3 - 2 * t);
+		crouch = seatTransition.entering ? eased : 1 - eased;
+		if (t === 1 && seatTransition.entering) {
+			setMode("drive");
+			resetChaseView({ x: car.pos[0], z: car.pos[2] }, world.groundHeight(car.pos[0], car.pos[2]));
+			flash("BACK IN THE CAR");
+			return;
+		}
+		if (t === 1) seatTransition = null;
+	}
+	driver.update(walker, crouch, dt);
+	updateWalkCamera(dt);
+	effects.update(car, dt);
+	sound.idle();
+	drawMinimap();
+	$("hint").textContent = WALK_HINTS[input.device];
+}
+
+function updateMode(dt) {
+	if (mode === "garage") garageFrame(dt);
+	else if (mode === "walk") walkFrame(dt);
+	else driveFrame(dt, window.sandbox.override ?? input.controls);
+}
+
 function frame(now) {
 	if (document.hidden) { last = now; requestAnimationFrame(frame); return; }
 	const dt = Math.min(0.1, (now - last) / 1000);
 	last = now;
 	input.update();
-	if (mode === "garage") garageFrame(dt);
-	else driveFrame(dt, window.sandbox.override ?? input.controls);
+	updateMode(dt);
 
 	if (flashTimer > 0 && (flashTimer -= dt) <= 0) $("flash").style.opacity = 0;
 	fpsFrames++;
@@ -808,7 +944,7 @@ function frame(now) {
 function advance(seconds, step = 1 / 60) {
 	for (let t = 0; t < seconds; t += step) {
 		input.update();
-		driveFrame(step, window.sandbox.override ?? input.controls);
+		updateMode(step);
 	}
 }
 

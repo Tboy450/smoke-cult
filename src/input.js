@@ -11,9 +11,9 @@ function shapeStick(x) {
 
 const MENU_KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
 
-export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onController = () => {}, onGarage = () => {}, onCombo = () => {}, onLift = () => {}, onMenu = () => {}, isMenuOpen = () => false, isTouchBlocked = () => false }) {
+export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onController = () => {}, onGarage = () => {}, onCombo = () => {}, onLift = () => {}, onInteract = () => {}, onMenu = () => {}, isMenuOpen = () => false, isTouchBlocked = () => false }) {
 	const keys = new Set();
-	const touch = { gas: false, brake: false, handbrake: false, steer: 0 };
+	const touch = { gas: false, brake: false, handbrake: false, steer: 0, walkZ: 0 };
 	let device = typeof matchMedia === "function" && matchMedia(TOUCH_LAYOUT_QUERY).matches ? "touch" : "keyboard";
 	let padWas = {};
 	let padId = null;
@@ -23,7 +23,7 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 	let steerId = null;
 	const clearTouch = () => {
 		touch.gas = touch.brake = touch.handbrake = false;
-		touch.steer = 0;
+		touch.steer = touch.walkZ = 0;
 		steerId = null;
 		heldButtons.clear();
 	};
@@ -68,6 +68,7 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 		if (e.code === "KeyG") onGarage();
 		if (e.code === "KeyH") onCombo();
 		if (e.code === "KeyL") onLift();
+		if (e.code === "KeyF") onInteract();
 		if (e.code === "Space") e.preventDefault();
 	});
 	addEventListener("keyup", (e) => keys.delete(e.code));
@@ -77,21 +78,24 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 
 	// Touch: drag anywhere on the left half to steer; buttons on the right.
 	const steerZone = document.getElementById("touch-steer");
-	let steerStartX = 0;
+	let steerStartX = 0, steerStartY = 0;
 	steerZone?.addEventListener("pointerdown", (e) => {
 		if (steerId !== null || isTouchBlocked()) return;
 		steerId = e.pointerId;
 		steerStartX = e.clientX;
+		steerStartY = e.clientY ?? 0;
 		steerZone.setPointerCapture(e.pointerId);
 		device = "touch";
 	});
 	steerZone?.addEventListener("pointermove", (e) => {
-		if (e.pointerId === steerId) touch.steer = Math.max(-1, Math.min(1, (e.clientX - steerStartX) / 90));
+		if (e.pointerId !== steerId) return;
+		touch.steer = Math.max(-1, Math.min(1, (e.clientX - steerStartX) / 90));
+		touch.walkZ = Math.max(-1, Math.min(1, ((e.clientY ?? 0) - steerStartY) / 90));
 	});
 	const endSteer = (e) => {
 		if (e.pointerId === steerId) {
 			steerId = null;
-			touch.steer = 0;
+			touch.steer = touch.walkZ = 0;
 		}
 	};
 	steerZone?.addEventListener("pointerup", endSteer);
@@ -115,22 +119,34 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 	for (const [id, fn] of [["touch-preset", onPreset], ["touch-reset", onReset], ["touch-cam", onCamera], ["touch-tune", onTune], ["touch-garage", onGarage]]) {
 		document.getElementById(id)?.addEventListener("click", fn);
 	}
+	document.getElementById("vehicle-action")?.addEventListener("click", (event) => {
+		onInteract();
+		if (event.detail > 0) event.currentTarget.blur();
+	});
 
 	const controls = { throttle: 0, brake: 0, steer: 0, handbrake: false };
+	const walk = { x: 0, z: 0, jog: false };
+	const idle = () => {
+		Object.assign(controls, { throttle: 0, brake: 0, steer: 0, handbrake: false });
+		Object.assign(walk, { x: 0, z: 0, jog: false });
+	};
 	const down = (...codes) => codes.some((c) => keys.has(c));
 
 	return {
 		controls,
+		walk,
+		clearTouch,
 		get device() {
 			return device;
 		},
 		touch,
 		update() {
 			if (!active || document.hidden) {
-				Object.assign(controls, { throttle: 0, brake: 0, steer: 0, handbrake: false });
+				idle();
 				return;
 			}
 			let padSteer = 0;
+			let padWalkZ = 0;
 			let padGas = 0;
 			let padBrake = 0;
 			let padHandbrake = false;
@@ -146,6 +162,7 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 			if (pad) {
 				const b = (i) => pad.buttons[i] ?? { value: 0, pressed: false };
 				padSteer = shapeStick(pad.axes[0] ?? 0);
+				padWalkZ = shapeStick(pad.axes[1] ?? 0);
 				padGas = b(7).value;
 				padBrake = b(6).value;
 				padHandbrake = b(0).pressed || b(2).pressed;
@@ -168,15 +185,16 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 					if (pressedNow(13)) onReset(); // D-pad down
 					if (pressedNow(1)) onLift(); // B / Circle
 					if (pressedNow(3)) onCamera(); // Y
+					if (pressedNow(5)) onInteract(); // RB / R1
 					if (pressedNow(9)) onGarage(); // Menu
 				}
 				if (pressedNow(8)) onTune(); // View
 				for (let i = 0; i < pad.buttons.length; i++) padWas[i] = pad.buttons[i].pressed;
-				if (padSteer || padGas > 0.05 || padBrake > 0.05 || padHandbrake) device = "gamepad";
+				if (padSteer || padWalkZ || padGas > 0.05 || padBrake > 0.05 || padHandbrake) device = "gamepad";
 			}
 			if (isMenuOpen()) {
 				clearTouch();
-				Object.assign(controls, { throttle: 0, brake: 0, steer: 0, handbrake: false });
+				idle();
 				return;
 			}
 			if (isTouchBlocked()) clearTouch();
@@ -185,6 +203,10 @@ export function createInput({ onPreset, onReset, onCamera, onTune, onMute, onCon
 			controls.throttle = Math.max(down("KeyW", "ArrowUp") ? 1 : 0, padGas, touch.gas ? 1 : 0);
 			controls.brake = Math.max(down("KeyS", "ArrowDown") ? 1 : 0, padBrake, touch.brake ? 1 : 0);
 			controls.handbrake = down("Space") || padHandbrake || touch.handbrake;
+			const keyWalkZ = Number(down("KeyS", "ArrowDown")) - Number(down("KeyW", "ArrowUp"));
+			walk.x = controls.steer;
+			walk.z = keyWalkZ || padWalkZ || touch.walkZ;
+			walk.jog = down("ShiftLeft", "ShiftRight") || padHandbrake || touch.handbrake;
 		},
 	};
 }
