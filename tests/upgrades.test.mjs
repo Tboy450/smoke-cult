@@ -76,7 +76,7 @@ test('custom colors stick to the right row, survive saving, and bad ones are ign
   setCustomColor(s, 'paint', 0x123456);
   assert.equal(picked(s, 'paint').id, 'custom');
   assert.equal(colorOf(s, 'paint'), 0x123456);
-  assert.equal(colorOf(s, 'rims'), OPTIONS.rims[0].color, 'other rows are untouched');
+	assert.equal(colorOf(s, 'rims'), colorOf(createGarageState(), 'rims'), 'other rows are untouched');
   const again = createGarageState(JSON.parse(JSON.stringify(saveData(s))));
   assert.equal(colorOf(again, 'paint'), 0x123456);
   stepOption(again, 'paint', 1);

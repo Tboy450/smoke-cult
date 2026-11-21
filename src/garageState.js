@@ -19,6 +19,7 @@ export const OPTIONS = {
 		{ id: "dish", name: "Deep Dish" },
 		{ id: "steel", name: "Steelie" },
 		{ id: "turbine", name: "Turbine" },
+		{ id: "eight", name: "Redline Eight" },
 	],
 	rims: [
 		{ id: "chrome", name: "Chrome", color: 0xc8c8d4 },
@@ -113,9 +114,11 @@ const validColor = (c) => Number.isInteger(c) && c >= 0 && c <= 0xffffff;
 
 export function createGarageState(saved = null, lowGraphics = false) {
 	const state = { tab: 0, row: 0, custom: { rims: 0xc8c8d4, paint: 0xff2aa0, decalColor: 0xf0f0f4 } };
+	const factory = (CARS.find((car) => car.id === saved?.car) ?? CARS[0]).factory;
 	for (const key of Object.keys(OPTIONS)) {
-		const found = OPTIONS[key].findIndex((o) => o.id === saved?.[key]);
-		state[key] = found >= 0 ? found : 0;
+		const options = OPTIONS[key];
+		const found = options.findIndex((o) => o.id === saved?.[key]);
+		state[key] = found >= 0 ? found : Math.max(0, options.findIndex((o) => o.id === factory?.[key]));
 	}
 	if (saved?.map === undefined && saved?.place === "touge") state.map = 1;
 	for (const key of WHEEL_COLORS) if (validColor(saved?.custom?.[key])) state.custom[key] = saved.custom[key];

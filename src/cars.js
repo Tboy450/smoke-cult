@@ -16,11 +16,13 @@ function wheelsFor(track, wheelbase) {
 export const CARS = [
 	{
 		id: "cinder", name: "CINDER 2D", tag: "All-rounder coupe. The one to learn on.",
-		width: 0.9, wheelbase: 2.6, track: 0.78, length: 4.36, floor: -0.47, wing: "gt", seatZ: 0.3, seatY: 0.34,
+		width: 0.9, wheelbase: 2.6, track: 0.78, length: 4.36, floor: -0.47, wing: "none", seatZ: 0.3, seatY: 0.34,
+		factory: { paint: "soot", rims: "black", wheels: "eight", glow: "off" },
+		fascia: "projector",
 		tuning: {},
-		upper: [[-2.18, -0.2], [-2.12, -0.02], [-1.9, 0.07], [-1.2, 0.16], [-0.8, 0.2], [0.3, 0.23], [1.2, 0.26], [1.95, 0.3], [2.14, 0.22], [2.18, 0.02]],
-		glass: [[-0.95, 0.17], [-0.35, 0.56], [0.25, 0.62], [0.85, 0.56], [1.5, 0.28]],
-		taper: [0.82, 0.86], glb: null,
+		upper: [[-2.18, -0.105], [-2.12, 0.005], [-1.9, 0.115], [-1.2, 0.17], [-0.8, 0.2], [0.3, 0.23], [1.2, 0.27], [1.95, 0.27], [2.14, 0.18], [2.18, 0.02]],
+		glass: [[-1.02, 0.18], [-0.32, 0.56], [0.18, 0.63], [0.68, 0.6], [1.06, 0.47], [1.53, 0.27]],
+		taper: [0.83, 0.88], glb: null,
 	},
 	{
 		id: "razor", name: "RAZOR KEI", tag: "Tiny and twitchy. Flicks instantly, bites back.",

@@ -1,6 +1,6 @@
 # SMOKE CULT — update checklist
 
-Updated November 8, 2026. Current update: on-foot driver with animated walking, jogging, and car entry and exit.
+Updated November 21, 2026. The Cinder 2D has a new factory look.
 Prior recovered garage update: `ff2879e`.
 
 This is the shared checklist for continuing SMOKE CULT. Update it whenever a feature is completed,
@@ -16,6 +16,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Lap timing, wrong-way detection and drift clipping zones.
 - [x] Angle/speed scoring, linked combos, multipliers, transition bonuses and clear banking/loss feedback.
 - [x] Five original code-built cars with different handling.
+- [x] Black factory Cinder 2D with red projector headlights, mesh grilles, and Redline Eight wheels. Saved customization takes precedence over factory colors and wheels.
 - [x] Smokehouse garage, drive-in bay and track/test-pad spawn choices.
 - [x] Garage tabs with keyboard, controller and touch navigation.
 - [x] Separate Map and Spawn rows in Game, with each map remembering its own spawn and older garage saves carried forward.
@@ -54,6 +55,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] All 93 Node tests and scripted physics checks passed with the longer descent. A stock car completed all six checkpoints and the finish without rail contact in simulation.
 - [x] Browser checks covered both map spawns, summit teleport, the complete cable lift ride, forward and reverse smoke, score collapse and expansion, and garage and tuning scrolling at 740 × 320.
 - [x] All 96 Node tests and scripted physics checks passed with the on-foot driver. Browser checks covered exit and re-entry on both maps, landscape movement at 740 × 320, blocking exit while moving, and invalidating a timed descent on exit.
+- [x] All 97 Node tests and scripted physics checks passed with the new Cinder 2D. Checked the stock look in the garage and drove it into Rustline Yard.
 - [x] User reports the game seems to work on their phone (basic play feedback, November 6).
 - [x] Headless physics checks passed for Arcade, Balanced and Off.
 - [x] All source JavaScript files passed syntax checks.

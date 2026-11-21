@@ -94,6 +94,16 @@ test('bad or missing saved data falls back safely', () => {
   assert.equal(picked(createGarageState({ graphics: 'high' }, true), 'graphics').id, 'high', 'a saved choice wins');
 });
 
+test('Cinder starts with the black factory look and keeps saved customization', () => {
+  const fresh = saveData(createGarageState());
+  assert.deepEqual([fresh.car, fresh.kit, fresh.paint, fresh.wheels, fresh.rims, fresh.glow],
+    ['cinder', 'stock', 'soot', 'eight', 'black', 'off']);
+  const oldSave = { car: 'cinder', kit: 'track', paint: 'pink', wheels: 'mesh', rims: 'chrome', glow: 'cyan' };
+  const restored = saveData(createGarageState(oldSave));
+  for (const [key, value] of Object.entries(oldSave)) assert.equal(restored[key], value);
+  assert.equal(picked(createGarageState({ car: 'razor' }), 'paint').id, 'pink');
+});
+
 test('legacy destinations migrate and each map remembers its own spawn', () => {
   const yard = createGarageState({ place: 'pad' });
   assert.equal(picked(yard, 'map').id, 'yard');

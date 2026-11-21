@@ -12,6 +12,8 @@ const GLASS = new THREE.MeshStandardMaterial({ color: 0x18222e, metalness: 0.75,
 const HEAD = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff2d6, emissiveIntensity: 3 });
 const TAIL = new THREE.MeshStandardMaterial({ color: 0xff1030, emissive: 0xff1030, emissiveIntensity: 3 });
 const TIRE = new THREE.MeshStandardMaterial({ color: 0x101012, roughness: 0.92 });
+const RED_WHEEL_BACKING = new THREE.MeshStandardMaterial({ color: 0x842024, roughness: 0.64, metalness: 0.15 });
+const LUG = new THREE.MeshStandardMaterial({ color: 0xb3b6bd, roughness: 0.32, metalness: 0.55 });
 
 function box(w, h, d, material, x, y, z) {
 	const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
@@ -95,11 +97,12 @@ function roofGeometry(def) {
 	return shapeAndSmooth(extrudeAcross(s, def.width * 0.87, 0.02, 12), (y) => 1 - 0.2 * Math.max(0, (y - baseY) / (topY - baseY)));
 }
 
-// One wheel's shapes, merged by material. Three draw calls per wheel instead of seventeen, which phones feel.
+// Merge each wheel's pieces by material so the spokes and fasteners stay cheap to draw.
 function wheelGeometry(radius, style) {
 	const width = 0.27;
 	const dishes = [];
 	const metal = [];
+	const lugs = [];
 	const spokes = (x, count, length, thick, turn = 0, at = 0.36) => {
 		for (let i = 0; i < count; i++) {
 			const angle = (i / count) * Math.PI * 2;
@@ -128,11 +131,20 @@ function wheelGeometry(radius, style) {
 			ring(face + side * 0.018, 0.34, 0.03);
 		}
 		if (style === "turbine") spokes(face + side * 0.01, 12, radius * 0.56, radius * 0.1, 0.7);
+		if (style === "eight") {
+			spokes(face + side * 0.014, 8, radius * 0.54, radius * 0.11, 0, 0.43);
+			for (let i = 0; i < 5; i++) {
+				const angle = i * Math.PI * 2 / 5;
+				lugs.push(new THREE.CylinderGeometry(0.009, 0.009, 0.012, 6).rotateZ(Math.PI / 2)
+					.translate(face + side * 0.028, Math.cos(angle) * radius * 0.125, Math.sin(angle) * radius * 0.125));
+			}
+		}
 	}
 	return {
 		tire: new THREE.CylinderGeometry(radius, radius, width, 28).rotateZ(Math.PI / 2),
 		dish: mergeGeometries(dishes),
 		metal: mergeGeometries(metal),
+		lugs: lugs.length ? mergeGeometries(lugs) : null,
 	};
 }
 
@@ -140,8 +152,102 @@ function makeWheel(parts, rimMaterial) {
 	const group = new THREE.Group();
 	const tire = new THREE.Mesh(parts.tire, TIRE);
 	tire.castShadow = true;
-	group.add(tire, new THREE.Mesh(parts.dish, DARK), new THREE.Mesh(parts.metal, rimMaterial));
+	group.add(tire, new THREE.Mesh(parts.dish, parts.lugs ? RED_WHEEL_BACKING : DARK), new THREE.Mesh(parts.metal, rimMaterial));
+	if (parts.lugs) group.add(new THREE.Mesh(parts.lugs, LUG));
 	return group;
+}
+
+let projectorMaterial;
+
+function makeProjectorTexture() {
+	const canvas = document.createElement("canvas");
+	canvas.width = 512;
+	canvas.height = 256;
+	const g = canvas.getContext("2d");
+	const grille = (outline, rows, columns, x, y, width, height) => {
+		g.save();
+		g.clip(outline);
+		g.fillStyle = "#222126";
+		g.fillRect(x, y, width, height);
+		const stepX = width / columns;
+		const stepY = height / rows;
+		for (let row = 0; row < rows; row++) {
+			for (let col = -1; col < columns; col++) {
+				const left = x + (col + (row % 2) * 0.5) * stepX;
+				const top = y + row * stepY;
+				g.beginPath();
+				g.moveTo(left + 3, top + 1);
+				g.lineTo(left + stepX - 2, top + 1);
+				g.lineTo(left + stepX - 5, top + stepY - 2);
+				g.lineTo(left, top + stepY - 2);
+				g.closePath();
+				g.fillStyle = "#09090c";
+				g.fill();
+			}
+		}
+		g.restore();
+		g.strokeStyle = "#0c0c10";
+		g.lineWidth = 5;
+		g.stroke(outline);
+	};
+	grille(new Path2D("M144 91 Q256 66 368 91 L359 145 Q336 172 256 176 Q176 172 153 145 Z"), 9, 19, 140, 73, 232, 107);
+	grille(new Path2D("M140 210 Q256 196 372 210 L362 237 Q256 245 150 237 Z"), 4, 20, 137, 195, 238, 53);
+	for (const side of [-1, 1]) {
+		g.save();
+		g.translate(256, 0);
+		g.scale(side, 1);
+		grille(new Path2D("M139 190 Q177 177 217 188 L198 223 Q183 237 150 228 Z"), 5, 7, 136, 178, 82, 57);
+		const lens = new Path2D("M116 128 Q126 105 156 93 L225 48 Q238 42 234 59 Q222 116 185 132 Q153 144 116 128 Z");
+		const red = g.createLinearGradient(0, 49, 0, 140);
+		red.addColorStop(0, "#ff7566");
+		red.addColorStop(0.54, "#e62b32");
+		red.addColorStop(1, "#690c19");
+		g.fillStyle = red;
+		g.fill(lens);
+		g.strokeStyle = "#150b10";
+		g.lineJoin = "round";
+		g.lineWidth = 7;
+		g.stroke(lens);
+		g.clip(lens);
+		g.strokeStyle = "#ffa098";
+		g.lineWidth = 3;
+		g.stroke(new Path2D("M121 125 Q149 103 230 53 M141 133 Q190 129 221 76"));
+		for (const [x, y, rx, ry] of [[155, 122, 7, 10], [178, 111, 9, 13], [202, 91, 13, 18]]) {
+			g.beginPath();
+			g.ellipse(x, y, rx, ry, 0.24, 0, Math.PI * 2);
+			g.fillStyle = "#ff463d";
+			g.fill();
+			g.strokeStyle = "#70101a";
+			g.lineWidth = 2;
+			g.stroke();
+		}
+		g.restore();
+	}
+	const map = new THREE.CanvasTexture(canvas);
+	map.colorSpace = THREE.SRGBColorSpace;
+	map.anisotropy = 4;
+	return map;
+}
+
+// Project the lenses and grilles onto the rounded body so they wrap around the nose.
+function projectorFascia(body, def) {
+	projectorMaterial ??= new THREE.MeshBasicMaterial({
+		map: makeProjectorTexture(), alphaTest: 0.45, side: THREE.DoubleSide, toneMapped: false,
+	});
+	const geometry = new THREE.PlaneGeometry(1.65, 0.565, 40, 18);
+	const vertices = geometry.getAttribute("position");
+	const ray = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 0, 1), 0, 1.3);
+	const noseZ = def.upper[0][0];
+	for (let i = 0; i < vertices.count; i++) {
+		const x = vertices.getX(i);
+		const y = vertices.getY(i) - 0.183;
+		ray.ray.origin.set(x, y, noseZ - 0.12);
+		const [hit] = ray.intersectObject(body, false);
+		// The extreme top and side of the rectangle are transparent in the texture.
+		const z = hit?.point.z ?? noseZ + 0.11;
+		vertices.setXYZ(i, x, y, z - 0.022);
+	}
+	return new THREE.Mesh(geometry, projectorMaterial);
 }
 
 function glowTexture() {
@@ -253,10 +359,10 @@ function addDetails(group, def, paint, kit, archRadius, wheelY) {
 	const [noseZ, noseY] = def.upper[0];
 	const tailZ = def.upper[def.upper.length - 1][0];
 	// Nose: grille, splitter, lights.
-	group.add(box(w * 1.15, 0.13, 0.05, DARK, 0, noseY + 0.04, noseZ + 0.02));
+	if (!def.fascia) group.add(box(w * 1.15, 0.13, 0.05, DARK, 0, noseY + 0.04, noseZ + 0.02));
 	group.add(box(w * 2.04, 0.05, 0.42, TRIM, 0, def.floor - 0.015, noseZ + 0.17));
 	for (const side of [-1, 1]) {
-		group.add(box(w * 0.5, 0.055, 0.1, HEAD, side * w * 0.56, noseY + 0.24, noseZ + 0.14));
+		if (!def.fascia) group.add(box(w * 0.5, 0.055, 0.1, HEAD, side * w * 0.56, noseY + 0.24, noseZ + 0.14));
 		group.add(box(w * 0.58, 0.07, 0.04, TAIL, side * w * 0.52, 0.12, tailZ + 0.0));
 		group.add(box(0.04, 0.07, 1.7, TRIM, side * (w - 0.015), def.floor + 0.03, 0)); // side skirt
 		group.add(box(0.09, 0.055, 0.15, paint, side * (w * 0.92), def.glass[0][1] + 0.05, def.glass[0][0] + 0.32)); // mirror
@@ -377,6 +483,7 @@ export function createCarModel(scene, tuning) {
 			const roof = new THREE.Mesh(roofGeometry(def), paint);
 			roof.castShadow = true;
 			shell.add(body, cabin, roof);
+			if (def.fascia === "projector") shell.add(projectorFascia(body, def));
 			if (decal !== "none") {
 				addDecalUv(body.geometry, def);
 				addDecalUv(roof.geometry, def);
