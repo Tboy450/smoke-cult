@@ -1,6 +1,7 @@
 // What's picked in the garage. No graphics or page code here, so controller, keyboard and touch all share one set of rules.
 
 import { CARS } from "./cars.js";
+import { MAPS, SPAWNS, spawnById } from "./maps.js";
 import { PARTS } from "./upgrades.js";
 
 const CUSTOM = { id: "custom", name: "Custom" };
@@ -68,19 +69,7 @@ export const OPTIONS = {
 		{ id: "violet", name: "Violet", color: 0xa070ff },
 		{ id: "black", name: "Soot", color: 0x303036 },
 	],
-	map: [
-		{ id: "yard", name: "Rustline Yard" },
-		{ id: "touge", name: "Cinder Pass" },
-	],
-	place: [
-		{ id: "smokehouse", name: "Out the Door" },
-		{ id: "track", name: "Start Line" },
-		{ id: "pad", name: "Test Pad" },
-	],
-	mountainSpawn: [
-		{ id: "summit", name: "Summit Start" },
-		{ id: "base", name: "Lift Base" },
-	],
+	map: MAPS,
 	sound: [
 		{ id: "on", name: "On" },
 		{ id: "off", name: "Off" },
@@ -97,7 +86,7 @@ export const OPTIONS = {
 
 export const LABELS = {
 	car: "CAR", kit: "BODY KIT", wheels: "WHEELS", rims: "WHEEL COLOR", paint: "BODY COLOR", decal: "DECAL", decalColor: "DECAL COLOR",
-	glow: "UNDERGLOW", smoke: "TIRE SMOKE", map: "MAP", place: "SPAWN", mountainSpawn: "SPAWN", sound: "SOUND", graphics: "GRAPHICS",
+	glow: "UNDERGLOW", smoke: "TIRE SMOKE", map: "MAP", spawn: "SPAWN", sound: "SOUND", graphics: "GRAPHICS",
 };
 
 // Colors you can also set with the color wheel.
@@ -107,7 +96,7 @@ export const TABS = [
 	{ id: "car", label: "CAR", rows: ["car", "kit", "wheels", "rims"] },
 	{ id: "paint", label: "PAINT", rows: ["paint", "decal", "decalColor", "glow", "smoke"] },
 	{ id: "upgrades", label: "UPGRADES", rows: PARTS.map((p) => `part:${p.id}`) },
-	{ id: "game", label: "GAME", rows: ["map", "place", "sound", "graphics"] },
+	{ id: "game", label: "GAME", rows: ["map", "spawn", "sound", "graphics"] },
 ];
 
 const validColor = (c) => Number.isInteger(c) && c >= 0 && c <= 0xffffff;
@@ -120,16 +109,21 @@ export function createGarageState(saved = null, lowGraphics = false) {
 		const found = options.findIndex((o) => o.id === saved?.[key]);
 		state[key] = found >= 0 ? found : Math.max(0, options.findIndex((o) => o.id === factory?.[key]));
 	}
-	if (saved?.map === undefined && saved?.place === "touge") state.map = 1;
+	if (saved?.map === undefined && saved?.place === "touge") state.map = MAPS.findIndex((map) => map.id === "touge");
+	const legacySpawns = { yard: saved?.place, touge: saved?.mountainSpawn };
+	state.spawns = Object.fromEntries(MAPS.map(({ id }) => [id, spawnById(id, saved?.spawns?.[id] ?? legacySpawns[id]).id]));
 	for (const key of WHEEL_COLORS) if (validColor(saved?.custom?.[key])) state.custom[key] = saved.custom[key];
 	if (saved?.graphics === undefined && lowGraphics) state.graphics = 1;
 	if (saved?.combo === undefined && lowGraphics) state.combo = 1;
 	return state;
 }
 
-export const picked = (state, key) => OPTIONS[key][state[key]];
-export const spawnKey = (state) => picked(state, "map").id === "touge" ? "mountainSpawn" : "place";
-export const currentRows = (state) => TABS[state.tab].rows.map((row) => row === "place" ? spawnKey(state) : row);
+export function picked(state, key) {
+	if (key !== "spawn") return OPTIONS[key][state[key]];
+	const mapId = picked(state, "map").id;
+	return spawnById(mapId, state.spawns[mapId]);
+}
+export const currentRows = (state) => TABS[state.tab].rows;
 export const currentRow = (state) => currentRows(state)[state.row];
 export const isPartRow = (row) => row.startsWith("part:");
 
@@ -145,6 +139,13 @@ export function setCustomColor(state, key, color) {
 }
 
 export function stepOption(state, key, dx) {
+	if (key === "spawn") {
+		const mapId = picked(state, "map").id;
+		const options = SPAWNS[mapId];
+		const index = options.indexOf(picked(state, key));
+		state.spawns[mapId] = options[(index + dx + options.length) % options.length].id;
+		return key;
+	}
 	const count = OPTIONS[key].length;
 	state[key] = (state[key] + dx + count) % count;
 	return key;
@@ -168,6 +169,7 @@ export function switchTab(state, dx) {
 export function saveData(state) {
 	const data = Object.fromEntries(Object.keys(OPTIONS).map((key) => [key, picked(state, key).id]));
 	data.custom = { ...state.custom };
+	data.spawns = { ...state.spawns };
 	return data;
 }
 

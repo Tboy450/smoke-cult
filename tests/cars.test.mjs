@@ -80,8 +80,8 @@ test('garage navigation wraps, changes only the focused row and saves', () => {
   moveGarage(state, 0, 1);
   assert.equal(moveGarage(state, 1, 0), 'kit');
   assert.equal(picked(state, 'car').id, CARS.at(-1).id, 'other rows stay put');
-  stepOption(state, 'place', 1);
-  assert.equal(picked(state, 'place').id, 'track');
+  stepOption(state, 'spawn', 1);
+  assert.equal(picked(state, 'spawn').id, 'track');
 
   const again = createGarageState(JSON.parse(JSON.stringify(saveData(state))));
   for (const key of Object.keys(OPTIONS)) assert.equal(picked(again, key).id, picked(state, key).id);
@@ -107,14 +107,19 @@ test('Cinder starts with the black factory look and keeps saved customization', 
 test('legacy destinations migrate and each map remembers its own spawn', () => {
   const yard = createGarageState({ place: 'pad' });
   assert.equal(picked(yard, 'map').id, 'yard');
-  assert.equal(picked(yard, 'place').id, 'pad');
+  assert.equal(picked(yard, 'spawn').id, 'pad');
   const mountain = createGarageState({ place: 'touge' });
   assert.equal(picked(mountain, 'map').id, 'touge');
-  assert.equal(picked(mountain, 'mountainSpawn').id, 'summit');
+  assert.equal(picked(mountain, 'spawn').id, 'summit');
+  const lastSave = createGarageState({ map: 'touge', place: 'track', mountainSpawn: 'base' });
+  assert.equal(picked(lastSave, 'spawn').id, 'base');
+  assert.equal(saveData(lastSave).spawns.yard, 'track');
   stepOption(yard, 'map', 1);
-  stepOption(yard, 'mountainSpawn', 1);
+  stepOption(yard, 'spawn', 1);
   stepOption(yard, 'map', 1);
   const reloaded = createGarageState(saveData(yard));
-  assert.equal(picked(reloaded, 'place').id, 'pad');
-  assert.equal(picked(reloaded, 'mountainSpawn').id, 'base');
+  assert.equal(picked(reloaded, 'spawn').id, 'pad');
+  stepOption(reloaded, 'map', 1);
+  assert.equal(picked(reloaded, 'spawn').id, 'base');
+  assert.equal(picked(createGarageState({ map: 'touge', spawns: { touge: 'pad' } }), 'spawn').id, 'summit');
 });

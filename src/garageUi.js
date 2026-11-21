@@ -5,7 +5,7 @@ import { createColorWheel } from "./colorWheel.js";
 import { CAR, RANGES } from "./tuning.js";
 import { carById } from "./cars.js";
 import {
-	colorOf, currentRow, currentRows, isPartRow, LABELS, moveGarage, picked, setCustomColor, spawnKey, stepOption, switchTab, TABS, WHEEL_COLORS,
+	colorOf, currentRow, currentRows, isPartRow, LABELS, moveGarage, picked, setCustomColor, stepOption, switchTab, TABS, WHEEL_COLORS,
 } from "./garageState.js";
 import { carTuning, levelsFor, MAX_STAGE, nextPrice, PARTS, stageOf } from "./upgrades.js";
 
@@ -85,7 +85,7 @@ export function createGarageUi(root, state, progress, { onChange, onDrive, onBuy
 		});
 		const drive = root.querySelector("#garage-drive");
 		const map = picked(state, "map").name;
-		const spawn = picked(state, spawnKey(state)).name;
+		const spawn = picked(state, "spawn").name;
 		drive.textContent = `DRIVE · ${map.toUpperCase()}`;
 		drive.setAttribute("aria-label", `Drive ${map} from ${spawn}`);
 	}

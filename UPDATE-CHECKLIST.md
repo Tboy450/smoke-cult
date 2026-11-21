@@ -1,6 +1,6 @@
 # SMOKE CULT — update checklist
 
-Updated November 21, 2026. The Cinder 2D has a new factory look.
+Updated November 21, 2026. The Cinder 2D has a new factory look, and map loading is separate from spawn placement.
 Prior recovered garage update: `ff2879e`.
 
 This is the shared checklist for continuing SMOKE CULT. Update it whenever a feature is completed,
@@ -56,6 +56,7 @@ tested, published or deferred. A completed implementation is not proof that it f
 - [x] Browser checks covered both map spawns, summit teleport, the complete cable lift ride, forward and reverse smoke, score collapse and expansion, and garage and tuning scrolling at 740 × 320.
 - [x] All 96 Node tests and scripted physics checks passed with the on-foot driver. Browser checks covered exit and re-entry on both maps, landscape movement at 740 × 320, blocking exit while moving, and invalidating a timed descent on exit.
 - [x] All 97 Node tests and scripted physics checks passed with the new Cinder 2D. Checked the stock look in the garage and drove it into Rustline Yard.
+- [x] All 97 Node tests and scripted physics checks passed after separating map loading and spawn placement. Verified switching maps, retaining both spawn choices, and starting at Test Pad and Lift Base in the browser.
 - [x] User reports the game seems to work on their phone (basic play feedback, November 6).
 - [x] Headless physics checks passed for Arcade, Balanced and Off.
 - [x] All source JavaScript files passed syntax checks.

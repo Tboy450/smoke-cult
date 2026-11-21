@@ -52,8 +52,9 @@ test('saved progress is checked before it is trusted', () => {
 });
 
 test('garage tabs hold every selectable option and every part has a row', () => {
-  const rows = TABS.flatMap((_, tab) => [...currentRows({ tab, map: 0 }), ...currentRows({ tab, map: 1 })]);
+  const rows = TABS.flatMap((_, tab) => currentRows({ tab }));
   for (const key of Object.keys(OPTIONS).filter((key) => key !== 'combo')) assert.ok(rows.includes(key), `${key} has no row`);
+  assert.ok(rows.includes('spawn'));
   assert.ok(!rows.includes('combo'), 'the score panel has its own toggle');
   for (const part of PARTS) assert.ok(rows.includes(`part:${part.id}`), `${part.id} has no row`);
 });

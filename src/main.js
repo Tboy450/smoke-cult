@@ -8,6 +8,7 @@ import { createEffects } from "./effects.js";
 import { createGarageUi } from "./garageUi.js";
 import { colorOf, createGarageState, picked, saveData, stepOption } from "./garageState.js";
 import { createInput, TOUCH_LAYOUT_QUERY } from "./input.js";
+import { MAPS } from "./maps.js";
 import { canEnterCar, createWalker, doorSpots, stepWalker } from "./onFoot.js";
 import { createCar, fitCar, placeCar, resetCar, stepCar, carAxes } from "./physics.js";
 import { mergeRecords, readRecords } from "./records.js";
@@ -195,7 +196,8 @@ function payBanked() {
 	savePersonalBests();
 }
 
-function setRoute(mountain) {
+function activateMap(map) {
+	const mountain = map.id === "touge";
 	if (mountain && !tougeScenery) {
 		tougeScenery = buildTougeScenery(course);
 		liftRig = buildTougeLift(course, tougeScenery);
@@ -210,7 +212,7 @@ function setRoute(mountain) {
 	scene.background = mountain ? new THREE.Color(0x20263e) : null;
 	scene.fog.color.setHex(mountain ? 0x66768f : 0x8a4a78);
 	scene.fog.far = mountain ? 560 : 680;
-	$("route-name").textContent = mountain ? "Cinder Pass" : "Rustline Yard";
+	$("route-name").textContent = map.name;
 	$("route-progress").hidden = !mountain;
 	$("return-tools").hidden = !mountain;
 	$("lift-return").hidden = true;
@@ -271,13 +273,12 @@ function openGarage() {
 	finishScore(score, "Back to garage", true);
 	payBanked();
 	setMode("garage");
-	setRoute(false);
+	activateMap(MAPS[0]);
 	yard.garage.setLit(true);
 	garageUi.render();
 	fitView();
 }
 
-const SMOKEHOUSE_SPOT = { x: GARAGE.x, z: GARAGE.z, yaw: -Math.PI / 2 }; // nose toward the open door
 let bayArmed = true;
 function checkBay() {
 	if (!inGarageBay(car.pos[0], car.pos[2])) bayArmed = true;
@@ -288,21 +289,22 @@ function leaveGarage() {
 	setMode("drive");
 	yard.garage.setLit(false);
 	saveGarage();
-	setRoute(picked(garage, "map").id === "touge");
+	activateMap(picked(garage, "map"));
+	spawnSession(picked(garage, "spawn"));
+	fitView();
+}
+
+function spawnSession(spawn) {
+	const spot = spawn.position({ track, course });
 	if (onTouge) {
-		if (picked(garage, "mountainSpawn").id === "base") restartTouge(course.baseSpawn, "LIFT BASE · RIDE OR TELEPORT UP");
-		else restartTouge();
-		fitView();
+		restartTouge(spot, spawn.message);
 		return;
 	}
-	const destination = picked(garage, "place").id;
-	const spot = { smokehouse: SMOKEHOUSE_SPOT, track: track.spawn, pad: track.padSpawn }[destination];
 	placeCar(car, spot.x, spot.z, spot.yaw);
 	bayArmed = false; // leaving the bay shouldn't reopen the garage
 	resetLap(lap, track, car.pos[0], car.pos[2]);
 	resetCones();
 	resetChaseView(spot);
-	fitView();
 }
 
 function resetChaseView(spot, ground = 0) {
